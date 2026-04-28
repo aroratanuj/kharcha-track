@@ -1,0 +1,26 @@
+# Render deployment configuration
+services:
+  # Web Service
+  - type: web
+    name: kts-backend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Add these in Render dashboard:
+      # - DATABASE_URL
+      # - JWT_SECRET
+      # - GROQ_API_KEY
+      # - MAILGUN_API_KEY
+      # - CLOUDFLARE_R2_ACCESS_KEY
+      # - CLOUDFLARE_R2_SECRET_KEY
+      # - CLOUDFLARE_R2_BUCKET
+
+# Free tier specifications:
+# - 512 MB RAM
+# - 0.1 CPU
+# - 750 hours/month (enough for 24/7 operation)
