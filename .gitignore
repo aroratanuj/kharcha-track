@@ -1,0 +1,58 @@
+# Environment Variables (NEVER commit these!)
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Build Outputs
+dist/
+build/
+.expo/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+*.pid
+
+# Package Managers
+package-lock.json
+yarn.lock
+
+# React Native
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*.ipa
+*.apk
+
+# Expo
+.expo-shared/
+*.orig
+
+# Nx Workspace
+.nx/
+workspace-data/
+
+# Temporary Files
+tmp/
+temp/
+.cache/

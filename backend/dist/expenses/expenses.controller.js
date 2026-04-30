@@ -21,6 +21,9 @@ let ExpensesController = class ExpensesController {
     constructor(expensesService) {
         this.expensesService = expensesService;
     }
+    async create(amount, description, merchantName, date, categoryId, status, req) {
+        return this.expensesService.create(req.user.userId, amount, description, merchantName, date ? new Date(date) : new Date(), categoryId, status || expense_entity_1.ExpenseStatus.CONFIRMED);
+    }
     async findAll(req, status) {
         return this.expensesService.findAll(req.user.userId, status);
     }
@@ -41,6 +44,19 @@ let ExpensesController = class ExpensesController {
     }
 };
 exports.ExpensesController = ExpensesController;
+__decorate([
+    (0, common_1.Post)(),
+    __param(0, (0, common_1.Body)('amount')),
+    __param(1, (0, common_1.Body)('description')),
+    __param(2, (0, common_1.Body)('merchantName')),
+    __param(3, (0, common_1.Body)('date')),
+    __param(4, (0, common_1.Body)('categoryId')),
+    __param(5, (0, common_1.Body)('status')),
+    __param(6, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, String, String, String, String, String, Object]),
+    __metadata("design:returntype", Promise)
+], ExpensesController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Req)()),

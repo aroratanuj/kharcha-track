@@ -5,9 +5,14 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS for mobile app
+  // Enable CORS for mobile and web apps
   app.enableCors({
-    origin: process.env.MOBILE_APP_URL || '*',
+    origin: [
+      'http://localhost:8081',
+      'exp://localhost:19000',
+      'http://localhost:19006',
+      process.env.MOBILE_APP_URL || '*',
+    ].filter(Boolean),
     credentials: true,
   });
 

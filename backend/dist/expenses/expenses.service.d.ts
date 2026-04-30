@@ -5,6 +5,7 @@ export declare class ExpensesService {
     private expenseRepository;
     private categoryRepository;
     constructor(expenseRepository: Repository<Expense>, categoryRepository: Repository<Category>);
+    create(userId: string, amount: number, description: string, merchantName: string, date: Date, categoryId?: string, status?: ExpenseStatus): Promise<Expense>;
     findAll(userId: string, status?: ExpenseStatus): Promise<Expense[]>;
     findOne(id: string, userId: string): Promise<Expense>;
     update(id: string, userId: string, updates: Partial<Expense>): Promise<Expense>;

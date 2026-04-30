@@ -3,6 +3,7 @@ import { ExpenseStatus } from '../entities/expense.entity';
 export declare class ExpensesController {
     private expensesService;
     constructor(expensesService: ExpensesService);
+    create(amount: number, description: string, merchantName?: string, date?: string, categoryId?: string, status?: ExpenseStatus, req?: any): Promise<import("../entities/expense.entity").Expense>;
     findAll(req: any, status?: ExpenseStatus): Promise<import("../entities/expense.entity").Expense[]>;
     findOne(id: string, req: any): Promise<import("../entities/expense.entity").Expense>;
     update(id: string, updates: any, req: any): Promise<import("../entities/expense.entity").Expense>;

@@ -8,6 +8,27 @@ import { ExpenseStatus } from '../entities/expense.entity';
 export class ExpensesController {
   constructor(private expensesService: ExpensesService) {}
 
+  @Post()
+  async create(
+    @Body('amount') amount: number,
+    @Body('description') description: string,
+    @Body('merchantName') merchantName?: string,
+    @Body('date') date?: string,
+    @Body('categoryId') categoryId?: string,
+    @Body('status') status?: ExpenseStatus,
+    @Req() req?: any,
+  ) {
+    return this.expensesService.create(
+      req.user.userId,
+      amount,
+      description,
+      merchantName,
+      date ? new Date(date) : new Date(),
+      categoryId,
+      status || ExpenseStatus.CONFIRMED,
+    );
+  }
+
   @Get()
   async findAll(@Req() req, @Query('status') status?: ExpenseStatus) {
     return this.expensesService.findAll(req.user.userId, status);

@@ -23,6 +23,26 @@ let ExpensesService = class ExpensesService {
         this.expenseRepository = expenseRepository;
         this.categoryRepository = categoryRepository;
     }
+    async create(userId, amount, description, merchantName, date, categoryId, status = expense_entity_1.ExpenseStatus.CONFIRMED) {
+        if (categoryId) {
+            const category = await this.categoryRepository.findOne({
+                where: { id: categoryId, userId },
+            });
+            if (!category) {
+                throw new common_1.NotFoundException('Category not found');
+            }
+        }
+        const expense = this.expenseRepository.create({
+            userId,
+            amount,
+            description,
+            merchantName,
+            date,
+            categoryId,
+            status,
+        });
+        return this.expenseRepository.save(expense);
+    }
     async findAll(userId, status) {
         const query = this.expenseRepository
             .createQueryBuilder('expense')
