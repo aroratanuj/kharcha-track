@@ -20,7 +20,7 @@ export function useResponsive() {
 
   const isNarrowScreen = dimensions.width < 600;
 
-  const maxContentWidth = isNarrowScreen ? '100%' : dimensions.width < 900 ? '90%' : 800;
+  const maxContentWidth = (isNarrowScreen ? '100%' : dimensions.width < 900 ? '90%' : 800) as number | string;
   const contentPadding = isNarrowScreen ? 16 : 24;
 
   return {

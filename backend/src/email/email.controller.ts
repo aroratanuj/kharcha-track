@@ -1,52 +1,51 @@
-import { Controller, Post, Body, Req } from '@nestjs/common';
-import { Request } from 'express';
+import crypto from 'crypto';
+import { Controller, Post, Body } from '@nestjs/common';
 import { EmailService } from './email.service';
+
+function hashContent(str: string): string {
+  return crypto.createHash('sha256').update(str).digest('hex');
+}
 
 @Controller('email')
 export class EmailController {
   constructor(private emailService: EmailService) {}
 
   @Post('webhook')
-  async handleMailgunWebhook(
-    @Body() body: any,
-    @Req() req: Request,
-  ) {
-    // Verify Mailgun signature (implement in production)
-    // const signature = req.headers['signature'];
-    // const timestamp = req.headers['timestamp'];
-    // const token = req.headers['token'];
-
+  async handleMailgunWebhook(@Body() body: any) {
     try {
       const emailContent = body['body-plain'] || body['body-html'] || '';
-      const senderEmail = body.from || '';
+      const subject = body.subject || '';
 
-      // Extract user ID from email (you'll need to implement user lookup)
-      // For now, we'll use a default or extract from sender
-      const userId = await this.getUserIdFromEmail(senderEmail);
+      const recipient = body.recipient || body.to || '';
+      let userId = null;
 
-      if (!userId) {
-        return {
-          success: false,
-          message: 'User not found for this email address',
-        };
+      const plusMatch = recipient.match(/^expense\+(.+)@/i);
+      if (plusMatch) {
+        userId = plusMatch[1];
       }
 
-      const result = await this.emailService.processEmail(emailContent, userId);
+      if (!userId) {
+        const subMatch = subject.match(/expense\+(.+)@/i);
+        if (subMatch) {
+          userId = subMatch[1];
+        }
+      }
 
+      if (!userId) {
+        return { success: false, message: 'No user ID found in recipient address' };
+      }
+
+      const digest = hashContent((subject + '|' + emailContent).substring(0, 5000));
+      const existing = await this.emailService.findByDigest(digest);
+      if (existing) {
+        return { success: false, message: 'Duplicate email already processed', expenseId: existing };
+      }
+
+      const result = await this.emailService.processEmail(emailContent, userId, subject, digest);
       return result;
     } catch (error) {
       console.error('Webhook processing failed:', error);
-      return {
-        success: false,
-        error: error.message,
-      };
+      return { success: false, error: error.message };
     }
-  }
-
-  private async getUserIdFromEmail(email: string): Promise<string | null> {
-    // TODO: Implement user lookup by email
-    // For now, return null - you'll need to query the database
-    // to find the user associated with this email
-    return null;
   }
 }

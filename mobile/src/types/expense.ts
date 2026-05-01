@@ -7,6 +7,7 @@ export enum AccountSource {
   UPI = 'UPI',
   Card = 'Card',
   BankAccount = 'Bank Account',
+  Cash = 'Cash',
 }
 
 export interface Category {

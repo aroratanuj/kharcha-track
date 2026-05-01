@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { MongooseModule } from '@nestjs/mongoose';
 import * as path from 'path';
 import { AuthModule } from './auth/auth.module';
 import { ExpensesModule } from './expenses/expenses.module';
@@ -8,6 +8,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { EmailModule } from './email/email.module';
+import { AccountSourceModule } from './account-source/account-source.module';
 
 @Module({
   imports: [
@@ -18,19 +19,14 @@ import { EmailModule } from './email/email.module';
         path.resolve(process.cwd(), '../.env'),
       ],
     }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      url: process.env.DATABASE_URL,
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: process.env.NODE_ENV !== 'production',
-      logging: false,
-    }),
+    MongooseModule.forRoot(process.env.MONGODB_URI || process.env.DATABASE_URL),
     AuthModule,
     ExpensesModule,
     CategoriesModule,
     BudgetsModule,
     AnalyticsModule,
     EmailModule,
+    AccountSourceModule,
   ],
 })
 export class AppModule {}

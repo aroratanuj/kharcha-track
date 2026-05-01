@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { MongooseModule } from '@nestjs/mongoose';
 import { BudgetsService } from './budgets.service';
 import { BudgetsController } from './budgets.controller';
-import { Budget } from '../entities/budget.entity';
+import { Budget, BudgetSchema } from '../schemas/budget.schema';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Budget])],
+  imports: [MongooseModule.forFeature([{ name: Budget.name, schema: BudgetSchema }])],
   controllers: [BudgetsController],
   providers: [BudgetsService],
   exports: [BudgetsService],

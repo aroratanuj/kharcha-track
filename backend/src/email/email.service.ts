@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Expense, ExpenseStatus } from '../entities/expense.entity';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { Expense, ExpenseDocument } from '../schemas/expense.schema';
 import Groq from 'groq-sdk';
 
 @Injectable()
@@ -9,36 +9,41 @@ export class EmailService {
   private groq: Groq;
 
   constructor(
-    @InjectRepository(Expense)
-    private expenseRepository: Repository<Expense>,
+    @InjectModel(Expense.name) private expenseModel: Model<ExpenseDocument>,
   ) {
     this.groq = new Groq({
       apiKey: process.env.GROQ_API_KEY || '',
     });
   }
 
-  async processEmail(emailContent: string, userId: string) {
+  async findByDigest(digest: string): Promise<string | null> {
+    const expense = await this.expenseModel.findOne({ emailDigest: digest }).lean();
+    return expense ? expense._id.toString() : null;
+  }
+
+  async processEmail(emailContent: string, userId: string, subject: string, digest: string) {
     try {
       const parsedExpense = await this.parseExpenseWithAI(emailContent);
 
-      const expense = this.expenseRepository.create({
-        userId,
+      const expense = await this.expenseModel.create({
+        userId: new Types.ObjectId(userId),
         amount: parsedExpense.amount,
         description: parsedExpense.description,
         merchantName: parsedExpense.merchant,
         date: new Date(parsedExpense.date),
-        status: ExpenseStatus.DRAFT,
+        status: 'draft',
+        emailDigest: digest,
         metadata: {
           emailContent,
+          subject,
           confidence: parsedExpense.confidence,
+          source: 'email',
         },
       });
 
-      await this.expenseRepository.save(expense);
-
       return {
         success: true,
-        expenseId: expense.id,
+        expenseId: expense._id.toString(),
         parsed: parsedExpense,
       };
     } catch (error) {
@@ -82,8 +87,7 @@ ${emailContent}
   }
 
   private fallbackParsing(emailContent: string) {
-    // Simple regex-based fallback
-    const amountMatch = emailContent.match(/\$?(\d+\.?\d*)/);
+    const amountMatch = emailContent.match(/[\$₹]?\s*(\d+\.?\d*)/);
     const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
 
     return {

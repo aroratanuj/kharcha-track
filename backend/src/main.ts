@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { LogLevelMiddleware } from './common/log-level.middleware';
+import { logLevelMiddleware } from './common/log-level.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -25,7 +25,7 @@ async function bootstrap() {
   );
 
   app.setGlobalPrefix('api');
-  app.use(new LogLevelMiddleware());
+  app.use(logLevelMiddleware);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

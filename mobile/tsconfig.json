@@ -9,7 +9,7 @@
     "allowSyntheticDefaultImports": true,
     "jsx": "react-native",
     "lib": ["ES2020"],
-    "types": ["react-native", "jest"],
+    "types": ["react-native"],
     "baseUrl": "./src",
     "paths": {
       "@/*": ["*"],

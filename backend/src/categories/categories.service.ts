@@ -1,57 +1,52 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Category } from '../entities/category.entity';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Category, CategoryDocument } from '../schemas/category.schema';
 
 @Injectable()
 export class CategoriesService {
   constructor(
-    @InjectRepository(Category)
-    private categoryRepository: Repository<Category>,
+    @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
   ) {}
 
   async findAll() {
-    return this.categoryRepository.find({
-      order: { createdAt: 'ASC' },
-    });
+    const categories = await this.categoryModel.find().sort({ createdAt: 1 }).lean();
+    return categories.map(c => ({ ...c, id: c._id.toString() }));
   }
 
   async findOne(id: string, userId: string) {
-    return this.categoryRepository.findOne({
-      where: { id, userId },
-    });
+    return this.categoryModel.findOne({ _id: id, userId });
   }
 
   async create(userId: string, name: string, color?: string, icon?: string) {
-    const category = this.categoryRepository.create({
+    return this.categoryModel.create({
       userId,
       name,
       color: color || '#007AFF',
       icon,
     });
-
-    return this.categoryRepository.save(category);
   }
 
   async update(id: string, userId: string, updates: Partial<Category>) {
     const category = await this.findOne(id, userId);
 
     if (!category) {
-      throw new Error('Category not found');
+      throw new NotFoundException('Category not found');
     }
 
     Object.assign(category, updates);
-    return this.categoryRepository.save(category);
+    await category.save();
+    return category;
   }
 
   async delete(id: string, userId: string) {
     const category = await this.findOne(id, userId);
 
     if (!category) {
-      throw new Error('Category not found');
+      throw new NotFoundException('Category not found');
     }
 
-    await this.categoryRepository.remove(category);
+    await this.categoryModel.deleteOne({ _id: id });
     return { message: 'Category deleted successfully' };
   }
 }

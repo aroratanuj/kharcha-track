@@ -4,6 +4,12 @@ import { shouldLog } from '../hooks/useLogLevel';
 
 type ToastType = 'success' | 'error' | 'info';
 
+const TOAST_LOG_MAP: Record<ToastType, 'INFO' | 'ERROR' | 'WARN'> = {
+  success: 'INFO',
+  error: 'ERROR',
+  info: 'INFO',
+};
+
 interface Toast {
   id: number;
   message: string;
@@ -36,8 +42,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback(
     (message: string, type: ToastType) => {
-      const logLevel = TOAST_LOG_MAP[type] || 'INFO';
-      shouldLog(logLevel);
+      shouldLog(TOAST_LOG_MAP[type] || 'INFO');
 
       const id = nextId++;
       setToasts((prev) => [...prev, { id, message, type }]);
@@ -78,9 +83,9 @@ function ToastItem({ toast, index, onDismiss }: { toast: Toast; index: number; o
   }, []);
 
   const colors = {
-    success: { bg: '#10B981', text: '#fff' },
-    error: { bg: '#EF4444', text: '#fff' },
-    info: { bg: '#3B82F6', text: '#fff' },
+    success: { bg: '#34C759', text: '#fff' },
+    error: { bg: '#FF3B30', text: '#fff' },
+    info: { bg: '#007AFF', text: '#fff' },
   };
 
   const icons = {

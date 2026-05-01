@@ -1,40 +1,37 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import { User } from '../entities/user.entity';
+import { User, UserDocument } from '../schemas/user.schema';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private jwtService: JwtService,
   ) {}
 
   async register(email: string, password: string, fullName: string) {
-    const existingUser = await this.userRepository.findOne({ where: { email } });
+    const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
       throw new UnauthorizedException('User already exists');
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = this.userRepository.create({
+    const user = await this.userModel.create({
       email,
       passwordHash,
       fullName,
       role: 'user',
     });
 
-    await this.userRepository.save(user);
-
-    const token = this.generateToken(user.id, user.email, user.role);
+    const token = this.generateToken(user._id.toString(), user.email, user.role);
 
     return {
       user: {
-        id: user.id,
+        id: user._id.toString(),
         email: user.email,
         name: user.fullName,
         role: user.role,
@@ -44,7 +41,7 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    const user = await this.userRepository.findOne({ where: { email } });
+    const user = await this.userModel.findOne({ email });
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -56,11 +53,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const token = this.generateToken(user.id, user.email, user.role);
+    const token = this.generateToken(user._id.toString(), user.email, user.role);
 
     return {
       user: {
-        id: user.id,
+        id: user._id.toString(),
         email: user.email,
         name: user.fullName,
         role: user.role,
@@ -70,18 +67,28 @@ export class AuthService {
   }
 
   async getUserById(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const user = await this.userModel.findById(userId);
 
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
     return {
-      id: user.id,
+      id: user._id.toString(),
       email: user.email,
       name: user.fullName,
       role: user.role,
     };
+  }
+
+  async findAllUsers(): Promise<any[]> {
+    const users = await this.userModel.find().select('-passwordHash').lean();
+    return users.map(u => ({
+      id: u._id.toString(),
+      email: u.email,
+      name: u.fullName,
+      role: u.role,
+    }));
   }
 
   private generateToken(userId: string, email: string, role: string = 'user'): string {

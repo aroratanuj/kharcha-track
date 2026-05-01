@@ -2,7 +2,6 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req 
 import { ExpensesService } from './expenses.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { AdminGuard } from '../auth/admin.guard';
-import { ExpenseStatus } from '../entities/expense.entity';
 import { AccountSource } from '../constants/account-source.enum';
 
 @Controller('expenses')
@@ -17,7 +16,7 @@ export class ExpensesController {
     @Body('merchantName') merchantName?: string,
     @Body('date') date?: string,
     @Body('categoryId') categoryId?: string,
-    @Body('status') status?: ExpenseStatus,
+    @Body('status') status?: string,
     @Body('accountSource') accountSource?: AccountSource,
     @Body('notes') notes?: string,
     @Req() req?: any,
@@ -29,25 +28,25 @@ export class ExpensesController {
       merchantName,
       date ? new Date(date) : new Date(),
       categoryId,
-      status || ExpenseStatus.CONFIRMED,
+      status || 'confirmed',
       accountSource,
       notes,
     );
   }
 
   @Get()
-  async findAll(@Req() req, @Query('status') status?: ExpenseStatus) {
+  async findAll(@Req() req: any, @Query('status') status?: string): Promise<any> {
     return this.expensesService.findAll(req.user.userId, status);
   }
 
   @Get('all')
   @UseGuards(AdminGuard)
-  async findAllAdmin(@Query('userId') userId?: string, @Query('status') status?: ExpenseStatus) {
+  async findAllAdmin(@Query('userId') userId?: string, @Query('status') status?: string): Promise<any> {
     return this.expensesService.findAllAdmin(userId, status);
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req) {
+  async findOne(@Param('id') id: string, @Req() req: any): Promise<any> {
     return this.expensesService.findOne(id, req.user.userId);
   }
 
@@ -55,13 +54,13 @@ export class ExpensesController {
   async update(
     @Param('id') id: string,
     @Body() updates: any,
-    @Req() req,
-  ) {
+    @Req() req: any,
+  ): Promise<any> {
     return this.expensesService.update(id, req.user.userId, updates);
   }
 
   @Post(':id/confirm')
-  async confirm(@Param('id') id: string, @Req() req) {
+  async confirm(@Param('id') id: string, @Req() req: any): Promise<any> {
     return this.expensesService.confirm(id, req.user.userId);
   }
 

@@ -1,50 +1,32 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function BudgetDashboardScreen() {
+  const { colors } = useTheme();
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Budget Dashboard</Text>
-      <Text style={styles.subtitle}>Track your spending by category</Text>
-      <View style={styles.placeholder}>
-        <Text style={styles.placeholderText}>Budget tracking coming soon...</Text>
+    <View style={[s.outer, { backgroundColor: colors.bg }]}>
+      <View style={[s.screenBorder, { backgroundColor: colors.surface, borderColor: colors.screenBorder }]}>
+        <View style={s.content}>
+          <Text style={s.emoji}>💰</Text>
+          <Text style={[s.title, { color: colors.text }]}>Budgets</Text>
+          <Text style={[s.subtitle, { color: colors.textMuted }]}>Track your spending by category</Text>
+          <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[s.cardText, { color: colors.textMuted }]}>Budget tracking is in progress...</Text>
+          </View>
+        </View>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 30,
-  },
-  placeholder: {
-    padding: 30,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
+const s = StyleSheet.create({
+  outer: { flex: 1, alignItems: 'center', paddingTop: 4 },
+  screenBorder: { flex: 1, width: '100%', maxWidth: 700, borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
+  content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  emoji: { fontSize: 48, marginBottom: 12 },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 8 },
+  subtitle: { fontSize: 16, marginBottom: 30 },
+  card: { padding: 30, borderRadius: 10, borderWidth: 1, width: '80%', alignItems: 'center' },
+  cardText: { fontSize: 16, textAlign: 'center' },
 });

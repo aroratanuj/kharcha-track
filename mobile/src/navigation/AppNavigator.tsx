@@ -1,61 +1,59 @@
+import React, { useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { setLoginRedirect } from '../services/api';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
-import DraftExpensesScreen from '../screens/expenses/DraftExpensesScreen';
-import ExpenseFormScreen from '../screens/expenses/ExpenseFormScreen';
-import BudgetDashboardScreen from '../screens/budget/BudgetDashboardScreen';
-import AnalyticsDashboardScreen from '../screens/analytics/AnalyticsDashboardScreen';
-import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import AppDrawerNavigator from './AppDrawerNavigator';
 
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
+  const { colors, isDark } = useTheme();
+
+  useEffect(() => {
+    setLoginRedirect(() => signOut());
+  }, [signOut]);
 
   if (loading) {
-    return null;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDark ? '#121212' : '#F5F5F5' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
+    <NavigationContainer theme={{
+      dark: isDark,
+      colors: {
+        primary: colors.primary,
+        background: colors.bg,
+        card: colors.card,
+        text: colors.text,
+        border: colors.border,
+        notification: colors.primary,
+      },
+    }}>
+      <Stack.Navigator screenOptions={{
+        headerStyle: { backgroundColor: colors.headerBg },
+        headerTintColor: colors.text,
+      }}>
         {!user ? (
           <>
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Create Account' }} />
+            <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
           </>
         ) : (
-          <>
-            <Stack.Screen
-              name="DraftExpenses"
-              component={DraftExpensesScreen}
-              options={{ title: 'Review Queue', headerLeft: null }}
-            />
-            <Stack.Screen
-              name="ExpenseForm"
-              component={ExpenseFormScreen}
-              options={{ title: 'Add Expense' }}
-            />
-            <Stack.Screen
-              name="BudgetDashboard"
-              component={BudgetDashboardScreen}
-              options={{ title: 'Budgets' }}
-            />
-            <Stack.Screen
-              name="Analytics"
-              component={AnalyticsDashboardScreen}
-              options={{ title: 'Analytics' }}
-            />
-            {user.role === 'admin' && (
-              <Stack.Screen
-                name="AdminDashboard"
-                component={AdminDashboardScreen}
-                options={{ title: 'Admin Dashboard' }}
-              />
-            )}
-          </>
+          <Stack.Screen
+            name="Main"
+            component={AppDrawerNavigator}
+            options={{ headerShown: false }}
+          />
         )}
       </Stack.Navigator>
     </NavigationContainer>

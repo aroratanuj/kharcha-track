@@ -8,7 +8,7 @@ export class BudgetsController {
   constructor(private budgetsService: BudgetsService) {}
 
   @Get()
-  async findAll(@Req() req) {
+  async findAll(@Req() req: any): Promise<any> {
     return this.budgetsService.findAll(req.user.userId);
   }
 

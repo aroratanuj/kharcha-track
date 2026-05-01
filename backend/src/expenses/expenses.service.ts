@@ -1,18 +1,31 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Expense, ExpenseStatus } from '../entities/expense.entity';
-import { Category } from '../entities/category.entity';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { Expense, ExpenseDocument } from '../schemas/expense.schema';
+import { Category, CategoryDocument } from '../schemas/category.schema';
 import { AccountSource } from '../constants/account-source.enum';
 
 @Injectable()
 export class ExpensesService {
   constructor(
-    @InjectRepository(Expense)
-    private expenseRepository: Repository<Expense>,
-    @InjectRepository(Category)
-    private categoryRepository: Repository<Category>,
+    @InjectModel(Expense.name) private expenseModel: Model<ExpenseDocument>,
+    @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
   ) {}
+
+  private toPlain(doc: any) {
+    if (!doc) return null;
+    const obj = doc.toObject ? doc.toObject() : doc;
+    return {
+      ...obj,
+      id: obj._id?.toString(),
+      userId: obj.userId?.toString?.() || obj.userId,
+      categoryId: obj.categoryId?.toString?.() || obj.categoryId,
+    };
+  }
+
+  private toPlainArray(docs: any[]) {
+    return docs.map(d => this.toPlain(d));
+  }
 
   async create(
     userId: string,
@@ -21,138 +34,192 @@ export class ExpensesService {
     merchantName: string,
     date: Date,
     categoryId?: string,
-    status: ExpenseStatus = ExpenseStatus.CONFIRMED,
+    status: string = 'confirmed',
     accountSource?: AccountSource,
     notes?: string,
-  ) {
+  ): Promise<any> {
     if (categoryId) {
-      const category = await this.categoryRepository.findOne({
-        where: { id: categoryId },
-      });
+      const category = await this.categoryModel.findById(categoryId);
       if (!category) {
         throw new NotFoundException('Category not found');
       }
     }
 
-    const expense = this.expenseRepository.create({
-      userId,
+    const expense = await this.expenseModel.create({
+      userId: new Types.ObjectId(userId),
       amount,
       description,
       merchantName,
       date,
-      categoryId,
+      categoryId: categoryId ? new Types.ObjectId(categoryId) : null,
       status,
       accountSource,
       notes,
     });
 
-    return this.expenseRepository.save(expense);
+    return this.toPlain(expense);
   }
 
-  async findAll(userId: string, status?: ExpenseStatus) {
-    const query = this.expenseRepository
-      .createQueryBuilder('expense')
-      .leftJoinAndSelect('expense.category', 'category')
-      .where('expense.userId = :userId', { userId });
-
+  async findAll(userId: string, status?: string): Promise<any[]> {
+    const filter: any = { userId: new Types.ObjectId(userId) };
     if (status) {
-      query.andWhere('expense.status = :status', { status });
+      filter.status = status;
     }
 
-    return query.orderBy('expense.createdAt', 'DESC').getMany();
+    const expenses = await this.expenseModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .populate<{ categoryId: any }>('categoryId')
+      .lean();
+
+    return expenses.map(e => ({
+      ...e,
+      id: e._id.toString(),
+      userId: e.userId?.toString?.() || e.userId,
+      categoryId: e.categoryId?._id?.toString?.() || e.categoryId?.toString?.() || e.categoryId,
+      category: e.categoryId ? {
+        id: e.categoryId._id?.toString(),
+        name: e.categoryId.name,
+        color: e.categoryId.color,
+        icon: e.categoryId.icon,
+      } : null,
+    }));
   }
 
-  async findAllAdmin(userId?: string, status?: ExpenseStatus) {
-    const query = this.expenseRepository
-      .createQueryBuilder('expense')
-      .leftJoinAndSelect('expense.category', 'category')
-      .leftJoinAndSelect('expense.user', 'user')
-      .orderBy('expense.createdAt', 'DESC');
-
+  async findAllAdmin(userId?: string, status?: string): Promise<any[]> {
+    const filter: any = {};
     if (userId) {
-      query.andWhere('expense.userId = :userId', { userId });
+      filter.userId = new Types.ObjectId(userId);
     }
-
     if (status) {
-      query.andWhere('expense.status = :status', { status });
+      filter.status = status;
     }
 
-    return query.getMany();
+    const expenses = await this.expenseModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .populate<{ categoryId: any; userId: any }>('categoryId userId')
+      .lean();
+
+    return expenses.map(e => ({
+      ...e,
+      id: e._id.toString(),
+      userId: e.userId?._id?.toString?.() || e.userId?.toString?.() || e.userId,
+      categoryId: e.categoryId?._id?.toString?.() || e.categoryId?.toString?.() || e.categoryId,
+      category: e.categoryId ? {
+        id: e.categoryId._id?.toString(),
+        name: e.categoryId.name,
+        color: e.categoryId.color,
+        icon: e.categoryId.icon,
+      } : null,
+      user: e.userId ? {
+        id: e.userId._id?.toString(),
+        email: e.userId.email,
+        name: e.userId.fullName,
+      } : null,
+    }));
   }
 
-  async findOne(id: string, userId: string) {
-    const expense = await this.expenseRepository.findOne({
-      where: { id, userId },
-      relations: ['category'],
+  async findOne(id: string, userId: string): Promise<any> {
+    const expense = await this.expenseModel
+      .findOne({ _id: id, userId: new Types.ObjectId(userId) })
+      .populate<{ categoryId: any }>('categoryId')
+      .lean();
+
+    if (!expense) {
+      throw new NotFoundException('Expense not found');
+    }
+
+    return {
+      ...expense,
+      id: expense._id.toString(),
+      userId: expense.userId?.toString?.() || expense.userId,
+      categoryId: expense.categoryId?._id?.toString?.() || expense.categoryId?.toString?.() || expense.categoryId,
+      category: expense.categoryId ? {
+        id: expense.categoryId._id?.toString(),
+        name: expense.categoryId.name,
+        color: expense.categoryId.color,
+        icon: expense.categoryId.icon,
+      } : null,
+    };
+  }
+
+  async update(id: string, userId: string, updates: any): Promise<any> {
+    const expense = await this.expenseModel.findOne({
+      _id: id,
+      userId: new Types.ObjectId(userId),
     });
 
     if (!expense) {
       throw new NotFoundException('Expense not found');
     }
 
-    return expense;
-  }
-
-  async update(id: string, userId: string, updates: Partial<Expense>) {
-    const expense = await this.findOne(id, userId);
-
     if (updates.categoryId) {
-      const category = await this.categoryRepository.findOne({
-        where: { id: updates.categoryId },
-      });
-
+      const category = await this.categoryModel.findById(updates.categoryId);
       if (!category) {
         throw new NotFoundException('Category not found');
       }
     }
 
-    Object.assign(expense, updates);
-    return this.expenseRepository.save(expense);
-  }
-
-  async confirm(id: string, userId: string) {
-    const expense = await this.findOne(id, userId);
-
-    if (expense.status === ExpenseStatus.CONFIRMED) {
-      return expense;
+    const mongoUpdates: any = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (key === 'categoryId' && value) {
+        mongoUpdates.categoryId = new Types.ObjectId(value as string);
+      } else if (key === 'date' && value) {
+        mongoUpdates.date = new Date(value as string);
+      } else if (value !== undefined && key !== 'id' && key !== '_id') {
+        mongoUpdates[key] = value;
+      }
     }
 
-    expense.status = ExpenseStatus.CONFIRMED;
-
-    // Update budget spent amount
-    if (expense.categoryId) {
-      await this.updateBudgetSpent(userId, expense.categoryId, expense.amount);
-    }
-
-    return this.expenseRepository.save(expense);
+    await this.expenseModel.updateOne({ _id: id }, mongoUpdates);
+    return this.findOne(id, userId);
   }
 
-  async delete(id: string) {
-    const expense = await this.expenseRepository.findOne({ where: { id } });
+  async confirm(id: string, userId: string): Promise<any> {
+    const expense = await this.expenseModel.findOne({
+      _id: id,
+      userId: new Types.ObjectId(userId),
+    });
+
     if (!expense) {
       throw new NotFoundException('Expense not found');
     }
-    await this.expenseRepository.remove(expense);
+
+    if (expense.status === 'confirmed') {
+      return this.findOne(id, userId);
+    }
+
+    expense.status = 'confirmed';
+    await expense.save();
+
+    if (expense.categoryId) {
+      await this.updateBudgetSpent(userId, expense.categoryId.toString(), expense.amount);
+    }
+
+    return this.findOne(id, userId);
+  }
+
+  async delete(id: string) {
+    const expense = await this.expenseModel.findById(id);
+    if (!expense) {
+      throw new NotFoundException('Expense not found');
+    }
+    await this.expenseModel.deleteOne({ _id: id });
     return { message: 'Expense deleted successfully' };
   }
 
   async bulkConfirm(ids: string[], userId: string) {
-    const expenses = await this.expenseRepository
-      .createQueryBuilder('expense')
-      .where('expense.id IN (:...ids)', { ids })
-      .andWhere('expense.userId = :userId', { userId })
-      .andWhere('expense.status = :status', { status: ExpenseStatus.DRAFT })
-      .getMany();
+    const expenses = await this.expenseModel.find({
+      _id: { $in: ids.map(id => new Types.ObjectId(id)) },
+      userId: new Types.ObjectId(userId),
+      status: 'draft',
+    });
 
     for (const expense of expenses) {
-      expense.status = ExpenseStatus.CONFIRMED;
-
-      if (expense.categoryId) {
-        await this.updateBudgetSpent(userId, expense.categoryId, expense.amount);
-      }
+      expense.status = 'confirmed';
+      await expense.save();
     }
-
-    await this.expenseRepository.save(expenses);
 
     return {
       confirmed: expenses.length,
@@ -164,8 +231,5 @@ export class ExpensesService {
     const now = new Date();
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
-
-    // This would update the budget - implementation depends on budget entity structure
-    // For now, we'll skip this as budget module is not fully implemented
   }
 }

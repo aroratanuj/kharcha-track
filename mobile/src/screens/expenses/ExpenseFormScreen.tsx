@@ -1,77 +1,81 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/Toast';
 import { useResponsive } from '../../hooks/useResponsive';
 import DatePicker from '../../components/DatePicker';
 import api from '../../services/api';
 import { AccountSource } from '../../types/expense';
 
-interface Category {
-  id: string;
-  name: string;
-  color: string;
-  icon: string;
+if (Platform.OS === 'web') {
+  const styleId = 'kharcha-global-style';
+  if (!document.getElementById(styleId)) {
+    const s = document.createElement('style');
+    s.id = styleId;
+    s.textContent = `html,body,#root{height:100%}*{scrollbar-width:thin!important;scrollbar-color:#888 #f1f1f1!important}*::-webkit-scrollbar{width:8px!important}*::-webkit-scrollbar-track{background:#f1f1f1;border-radius:4px}*::-webkit-scrollbar-thumb{background:#888;border-radius:4px}*::-webkit-scrollbar-thumb:hover{background:#555}`;
+    document.head.appendChild(s);
+  }
 }
+
+interface Category { id: string; _id?: string; name: string; color: string; icon: string; }
+interface UserOption { id: string; email: string; name: string; role: string; }
+
+const ACCOUNTS = [
+  { value: AccountSource.UPI, icon: '📱', label: 'UPI' },
+  { value: AccountSource.Card, icon: '💳', label: 'Card' },
+  { value: AccountSource.BankAccount, icon: '🏦', label: 'Bank' },
+  { value: AccountSource.Cash, icon: '💵', label: 'Cash' },
+];
 
 export default function ExpenseFormScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const editingExpense = route.params?.expense || null;
+  const { user } = useAuth();
+  const { colors, isDark } = useTheme();
   const toast = useToast();
   const { isWeb, maxContentWidth, contentPadding } = useResponsive();
+  const isAdmin = user?.role === 'admin';
 
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [accountSource, setAccountSource] = useState<AccountSource | ''>('');
-  const [notes, setNotes] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [screenLoading, setScreenLoading] = useState(true);
   const [categoryLoadError, setCategoryLoadError] = useState(false);
+  const [users, setUsers] = useState<UserOption[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
 
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
   const [date, setDate] = useState(todayStr);
 
-  const amountRef = useRef<TextInput>(null);
-  const descRef = useRef<TextInput>(null);
+  const isFormValid = useMemo(() => {
+    return amount && parseFloat(amount) > 0 && description.trim() && categoryId && date && accountSource;
+  }, [amount, description, categoryId, date, accountSource]);
 
   useEffect(() => {
     (async () => {
       await loadCategories();
+      if (isAdmin) await loadUsers();
       if (editingExpense) {
         try {
           setAmount(editingExpense.amount ? String(editingExpense.amount) : '');
           setDescription(editingExpense.description || '');
-          if (editingExpense.categoryId) {
-            setCategoryId(editingExpense.categoryId);
-          }
-          if (editingExpense.accountSource) {
-            setAccountSource(editingExpense.accountSource);
-          }
-          if (editingExpense.notes) {
-            setNotes(editingExpense.notes);
-          }
+          const catId = editingExpense.categoryId?._id || editingExpense.categoryId || '';
+          if (catId) setCategoryId(typeof catId === 'string' ? catId : catId.toString());
+          if (editingExpense.accountSource) setAccountSource(editingExpense.accountSource);
+          if (editingExpense.userId) setSelectedUserId(editingExpense.userId);
           if (editingExpense.date) {
             const d = new Date(editingExpense.date);
-            if (!isNaN(d.getTime())) {
-              const dateStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
-              setDate(dateStr);
-            }
+            if (!isNaN(d.getTime())) setDate(`${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`);
           }
-        } catch (e) {
-          console.error('Error parsing expense:', e);
-        }
+        } catch (e) { console.error('Error parsing expense:', e); }
       }
       setScreenLoading(false);
     })();
@@ -79,396 +83,173 @@ export default function ExpenseFormScreen() {
 
   async function loadCategories() {
     try {
-      const response = await api.get('/categories');
-      if (response.data && response.data.length > 0) {
-        setCategories(response.data);
+      const res = await api.get('/categories');
+      if (res.data?.length > 0) {
+        setCategories(res.data.map((c: any) => ({ ...c, id: c.id || c._id?.toString() || '' })));
         setCategoryLoadError(false);
-      } else {
-        setCategoryLoadError(true);
-        toast.error('No categories found. Please add categories first.');
-      }
-    } catch (error: any) {
-      console.error('Failed to load categories', error);
-      setCategoryLoadError(true);
-      if (error.message?.includes('Network')) {
-        toast.error('Cannot connect to server. Is the backend running?');
-      } else {
-        toast.error('Failed to load categories');
-      }
-    }
+      } else { setCategoryLoadError(true); }
+    } catch { setCategoryLoadError(true); }
   }
 
-  function validate(): boolean {
-    const newErrors: Record<string, string> = {};
+  async function loadUsers() {
+    try {
+      const res = await api.get('/auth/users');
+      setUsers(res.data);
+      if (!selectedUserId && res.data?.length > 0) setSelectedUserId(res.data[0].id);
+    } catch { /* silent */ }
+  }
 
-    if (!amount || parseFloat(amount) <= 0) {
-      newErrors.amount = 'Enter a valid amount greater than 0';
-    }
-
-    if (!description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-
-    if (!categoryId) {
-      newErrors.category = 'Select a category to save';
-    }
-
-    if (!date) {
-      newErrors.date = 'Date is required';
-    } else {
-      const d = new Date(date);
-      const y = d.getFullYear();
-      if (y < 2000 || y > 2100) {
-        newErrors.date = 'Year must be 2000-2100';
-      }
-    }
-
-    if (!accountSource) {
-      newErrors.accountSource = 'Select an account';
-    }
-
-    if (notes && notes.length > 250) {
-      newErrors.notes = 'Notes must be 250 characters or less';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  function validate() {
+    const e: Record<string, string> = {};
+    if (!amount || parseFloat(amount) <= 0) e.amount = 'Enter a valid amount';
+    if (!description.trim()) e.description = 'Description is required';
+    if (!categoryId) e.category = 'Select a category';
+    if (!date) e.date = 'Date is required';
+    if (!accountSource) e.accountSource = 'Select an account';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   }
 
   async function handleSubmit() {
     if (!validate()) return;
-
     setLoading(true);
     try {
-      const expenseData = {
+      const userId = isAdmin ? selectedUserId : user?.id;
+      if (!userId) { toast.error('No user selected'); setLoading(false); return; }
+      const data: any = {
         amount: parseFloat(amount),
         description: description.trim(),
         categoryId,
         date: `${date}T00:00:00.000Z`,
         accountSource,
-        notes: notes || undefined,
       };
-
-      if (editingExpense && editingExpense.id) {
-        await api.put(`/expenses/${editingExpense.id}`, expenseData);
-        toast.success('Expense updated');
-      } else {
-        await api.post('/expenses', expenseData);
-        toast.success('Expense created');
-      }
-
-      navigation.goBack();
+      const url = editingExpense?.id ? `/expenses/${editingExpense.id}` : '/expenses';
+      const method = editingExpense?.id ? 'put' : 'post';
+      await api[method](url, data);
+      toast.success(editingExpense ? 'Expense updated' : 'Expense created');
+      navigation.navigate('Home');
     } catch (error: any) {
-      const msg = error.response?.data?.message;
-      if (msg) {
-        toast.error(msg);
-      } else if (error.message?.includes('Network')) {
-        toast.error('Cannot connect to server');
-      } else {
-        toast.error('Failed to save expense');
-      }
-    } finally {
-      setLoading(false);
-    }
+      toast.error(error.response?.data?.message || 'Failed to save');
+    } finally { setLoading(false); }
   }
 
-  function handleDescSubmit() {
-    amountRef.current?.focus();
-  }
-
-  function handleAmountSubmit() {
-    if (validate()) handleSubmit();
-  }
-
-  if (screenLoading) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: '#999', fontSize: 16 }}>Loading...</Text>
-      </View>
-    );
-  }
-
-  const gridStyle = {
-    flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    justifyContent: 'space-between',
-    gap: 8,
-  };
-
-  const gridItemStyle = {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    width: '30%',
-  };
+  if (screenLoading) return <View style={[s.loading, { backgroundColor: colors.bg }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={isWeb ? styles.scrollContentWeb : styles.scrollContent}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={true}
-      indicatorStyle="black"
-    >
-      <View style={[styles.form, { maxWidth: maxContentWidth, paddingHorizontal: contentPadding }]}>
-        <DatePicker
-          label="Date *"
-          value={date}
-          onChange={(val) => { setDate(val); setErrors({ ...errors, date: '' }); }}
-          error={errors.date}
-        />
+    <View style={[s.outer, { backgroundColor: colors.bg }]}>
+      <View style={[s.screenBorder, { backgroundColor: colors.surface, borderColor: colors.screenBorder }]}>
+        <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator indicatorStyle="black">
+          <View style={[s.form, { maxWidth: isWeb ? 600 : undefined, paddingHorizontal: 16 }]}>
+            <Text style={[s.title, { color: colors.text }]}>{editingExpense ? 'Edit Expense' : 'New Expense'}</Text>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Description *</Text>
-          <TextInput
-            ref={descRef}
-            style={[styles.input, errors.description && styles.inputError, styles.textArea]}
-            value={description}
-            onChangeText={(val) => { setDescription(val); setErrors({ ...errors, description: '' }); }}
-            onSubmitEditing={handleDescSubmit}
-            returnKeyType="next"
-            placeholder="e.g., Lunch at cafe"
-            placeholderTextColor="#999"
-            multiline
-            numberOfLines={2}
-          />
-          {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
-        </View>
+            {isAdmin && (
+              <View style={s.field}>
+                <Text style={[s.label, { color: colors.text }]}>Create For (User) *</Text>
+                {users.length === 0 ? <Text style={[s.empty, { color: colors.textMuted }]}>No users found</Text> : (
+                  <View style={s.userList}>
+                    {users.map(u => {
+                      const sel = selectedUserId === u.id;
+                      return (
+                        <TouchableOpacity key={u.id} style={[s.userItem, { borderColor: sel ? colors.primary : colors.border, backgroundColor: sel ? (isDark ? '#1a2a4a' : '#E8F4FF') : colors.inputBg }]} onPress={() => setSelectedUserId(u.id)}>
+                          <Text style={[s.userName, { color: colors.text }]}>{u.name}</Text>
+                          <Text style={[s.userEmail, { color: colors.textMuted }]}>{u.email}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Category *</Text>
-          {categoryLoadError ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorBoxText}>Categories failed to load</Text>
-              <TouchableOpacity onPress={loadCategories} style={styles.errorBoxButton}>
-                <Text style={styles.errorBoxButtonText}>Retry</Text>
-              </TouchableOpacity>
+            <DatePicker label="Date *" value={date} onChange={(val) => { setDate(val); setErrors({ ...errors, date: '' }); }} error={errors.date} />
+
+            <View style={s.field}>
+              <Text style={[s.label, { color: colors.text }]}>Amount *</Text>
+              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }, errors.amount && s.inputErr]} value={amount} onChangeText={(v) => { setAmount(v); setErrors({ ...errors, amount: '' }); }} placeholder="0.00" keyboardType="decimal-pad" placeholderTextColor={colors.textMuted} />
+              {errors.amount && <Text style={s.err}>{errors.amount}</Text>}
             </View>
-          ) : categories.length === 0 ? (
-            <Text style={styles.emptyText}>No categories available</Text>
-          ) : (
-            <View style={gridStyle}>
-              {categories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[
-                    gridItemStyle,
-                    categoryId === cat.id && { borderColor: '#007AFF', backgroundColor: '#E8F4FF' },
-                  ]}
-                  onPress={() => { setCategoryId(cat.id); setErrors({ ...errors, category: '' }); }}
-                >
-                  <Text style={styles.gridIcon}>{cat.icon}</Text>
-                  <Text
-                    style={[
-                      styles.gridLabel,
-                      categoryId === cat.id && { color: '#007AFF', fontWeight: '600' as const },
-                    ]}
-                  >
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+
+            <View style={s.field}>
+              <Text style={[s.label, { color: colors.text }]}>Description *</Text>
+              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }, errors.description && s.inputErr]} value={description} onChangeText={(v) => { setDescription(v); setErrors({ ...errors, description: '' }); }} placeholder="e.g., Lunch at cafe" placeholderTextColor={colors.textMuted} />
+              {errors.description && <Text style={s.err}>{errors.description}</Text>}
             </View>
-          )}
-          {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
-        </View>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Account *</Text>
-          <View style={gridStyle}>
-            {[AccountSource.UPI, AccountSource.Card, AccountSource.BankAccount].map((source) => (
-              <TouchableOpacity
-                key={source}
-                style={[
-                  gridItemStyle,
-                  accountSource === source && { borderColor: '#007AFF', backgroundColor: '#E8F4FF' },
-                ]}
-                onPress={() => { setAccountSource(source); setErrors({ ...errors, accountSource: '' }); }}
-              >
-                <Text style={styles.gridIcon}>
-                  {source === AccountSource.UPI ? '📱' : source === AccountSource.Card ? '💳' : '🏦'}
-                </Text>
-                <Text
-                  style={[
-                    styles.gridLabel,
-                    accountSource === source && { color: '#007AFF', fontWeight: '600' as const },
-                  ]}
-                >
-                  {source}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            <View style={s.field}>
+              <Text style={[s.label, { color: colors.text }]}>Category *</Text>
+              {categoryLoadError ? (
+                <View style={[s.errBox, { backgroundColor: isDark ? '#3a2020' : '#FFF0F0', borderColor: isDark ? '#5a3030' : '#FFD1D1' }]}>
+                  <Text style={s.errBoxText}>Failed to load</Text>
+                  <TouchableOpacity onPress={loadCategories} style={s.errBoxBtn}><Text style={s.errBoxBtnText}>Retry</Text></TouchableOpacity>
+                </View>
+              ) : (
+                <View style={s.grid}>
+                  {categories.map((cat) => {
+                    const sel = categoryId === (cat.id || cat._id?.toString());
+                    return (
+                      <TouchableOpacity key={cat.id || cat._id} style={[s.gridItem, { borderColor: colors.border, backgroundColor: colors.inputBg }, sel && { borderColor: colors.primary, backgroundColor: isDark ? '#1a2a4a' : '#E8F4FF' }]} onPress={() => { setCategoryId(cat.id || cat._id?.toString() || ''); setErrors({ ...errors, category: '' }); }}>
+                        <Text style={s.gridIcon}>{cat.icon}</Text>
+                        <Text style={[s.gridLabel, { color: colors.textSecondary }, sel && { color: colors.primary, fontWeight: '600' }]} numberOfLines={1}>{cat.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+              {errors.category && <Text style={s.err}>{errors.category}</Text>}
+            </View>
+
+            <View style={s.field}>
+              <Text style={[s.label, { color: colors.text }]}>Account *</Text>
+              <View style={s.grid}>
+                {ACCOUNTS.map((acc) => {
+                  const sel = accountSource === acc.value;
+                  return (
+                    <TouchableOpacity key={acc.value} style={[s.gridItem, { borderColor: colors.border, backgroundColor: colors.inputBg }, sel && { borderColor: colors.primary, backgroundColor: isDark ? '#1a2a4a' : '#E8F4FF' }]} onPress={() => { setAccountSource(acc.value); setErrors({ ...errors, accountSource: '' }); }}>
+                      <Text style={s.gridIcon}>{acc.icon}</Text>
+                      <Text style={[s.gridLabel, { color: colors.textSecondary }, sel && { color: colors.primary, fontWeight: '600' }]}>{acc.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {errors.accountSource && <Text style={s.err}>{errors.accountSource}</Text>}
+            </View>
+
+            <TouchableOpacity style={[s.submitBtn, { backgroundColor: isFormValid ? colors.primary : colors.border }, { marginTop: 8, marginBottom: 32 }]} onPress={handleSubmit} disabled={!isFormValid || loading}>
+              <Text style={[s.submitBtnText, { color: isFormValid ? colors.primaryText : colors.textMuted }]}>{loading ? 'Saving...' : editingExpense ? 'Update Expense' : 'Create Expense'}</Text>
+            </TouchableOpacity>
           </View>
-          {errors.accountSource && <Text style={styles.errorText}>{errors.accountSource}</Text>}
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Amount *</Text>
-          <TextInput
-            ref={amountRef}
-            style={[styles.input, errors.amount && styles.inputError]}
-            value={amount}
-            onChangeText={(val) => { setAmount(val); setErrors({ ...errors, amount: '' }); }}
-            onSubmitEditing={handleAmountSubmit}
-            returnKeyType="done"
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-            placeholderTextColor="#999"
-          />
-          {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
-        </View>
-
-        <View style={styles.field}>
-          <View style={styles.notesHeader}>
-            <Text style={styles.label}>Notes</Text>
-            <Text style={styles.notesCount}>{notes.length}/250</Text>
-          </View>
-          <TextInput
-            style={[styles.input, errors.notes && styles.inputError, styles.notesArea]}
-            value={notes}
-            onChangeText={(val) => { setNotes(val.slice(0, 250)); setErrors({ ...errors, notes: '' }); }}
-            placeholder="Optional notes (max 250 characters)"
-            placeholderTextColor="#999"
-            multiline
-            numberOfLines={3}
-            maxLength={250}
-          />
-          {errors.notes && <Text style={styles.errorText}>{errors.notes}</Text>}
-        </View>
-
-        <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          <Text style={styles.submitButtonText}>
-            {loading ? 'Saving...' : editingExpense ? 'Update Expense' : 'Create Expense'}
-          </Text>
-        </TouchableOpacity>
+        </ScrollView>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 40,
-  },
-  scrollContentWeb: {
-    flexGrow: 1,
-    alignItems: 'center',
-    paddingBottom: 40,
-  },
-  form: {
-    padding: 16,
-    width: '100%',
-  },
-  field: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    color: '#333',
-  },
-  textArea: {
-    minHeight: 60,
-    textAlignVertical: 'top',
-  },
-  notesArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  notesHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  notesCount: {
-    fontSize: 12,
-    color: '#999',
-  },
-  inputError: {
-    borderColor: '#FF3B30',
-  },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 12,
-    marginTop: 6,
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: '#FFF0F0',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#FFD1D1',
-  },
-  errorBoxText: {
-    color: '#CC0000',
-    fontSize: 13,
-    flex: 1,
-  },
-  errorBoxButton: {
-    backgroundColor: '#CC0000',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  errorBoxButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  emptyText: {
-    color: '#999',
-    fontSize: 14,
-    padding: 12,
-  },
-  gridIcon: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  gridLabel: {
-    fontSize: 11,
-    color: '#666',
-    textAlign: 'center',
-  },
-  submitButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 32,
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+const s = StyleSheet.create({
+  outer: { flex: 1, alignItems: 'center', paddingTop: 4 },
+  screenBorder: { flex: 1, width: '100%', borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 40 },
+  loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  form: { padding: 16, width: '100%' },
+  title: { fontSize: 22, fontWeight: '700', marginBottom: 20 },
+  field: { marginBottom: 20 },
+  label: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  input: { borderRadius: 10, padding: 14, fontSize: 16, borderWidth: 1 },
+  inputErr: { borderColor: '#FF3B30' },
+  err: { color: '#FF3B30', fontSize: 12, marginTop: 6 },
+  empty: { fontSize: 14, padding: 12 },
+  errBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 10, borderWidth: 1 },
+  errBoxText: { fontSize: 13, flex: 1, color: '#FF3B30' },
+  errBoxBtn: { backgroundColor: '#FF3B30', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  errBoxBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  userList: { gap: 8 },
+  userItem: { padding: 12, borderRadius: 10, borderWidth: 1 },
+  userName: { fontSize: 15, fontWeight: '600' },
+  userEmail: { fontSize: 12, marginTop: 2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  gridItem: { borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 2, width: '22%', minHeight: 60, justifyContent: 'center' },
+  gridIcon: { fontSize: 20, marginBottom: 2 },
+  gridLabel: { fontSize: 10, textAlign: 'center' },
+  submitBtn: { borderRadius: 10, padding: 16, alignItems: 'center' },
+  submitBtnText: { fontSize: 16, fontWeight: '600' },
 });

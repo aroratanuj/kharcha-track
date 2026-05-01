@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/Toast';
 import { useResponsive } from '../../hooks/useResponsive';
 
@@ -12,36 +14,19 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
   const toast = useToast();
+  const { colors } = useTheme();
   const { isWeb, maxContentWidth, contentPadding } = useResponsive();
+  const navigation = useNavigation<any>();
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
   async function handleRegister() {
-    if (!name.trim()) {
-      toast.error('Name is required');
-      return;
-    }
-
-    if (!email.trim()) {
-      toast.error('Email is required');
-      return;
-    }
-
-    if (!email.includes('@')) {
-      toast.error('Enter a valid email address');
-      return;
-    }
-
-    if (!password) {
-      toast.error('Password is required');
-      return;
-    }
-
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
+    if (!name.trim()) { toast.error('Name is required'); return; }
+    if (!email.trim()) { toast.error('Email is required'); return; }
+    if (!email.includes('@')) { toast.error('Enter a valid email address'); return; }
+    if (!password) { toast.error('Password is required'); return; }
+    if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
 
     setLoading(true);
     try {
@@ -49,50 +34,36 @@ export default function RegisterScreen() {
       toast.success('Account created successfully');
     } catch (error: any) {
       const msg = error.response?.data?.message;
-      if (msg) {
-        toast.error(msg);
-      } else if (error.message?.includes('Network')) {
-        toast.error('Cannot connect to server. Is the backend running?');
-      } else {
-        toast.error('Registration failed. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
+      if (msg) { toast.error(msg); }
+      else if (error.message?.includes('Network')) { toast.error('Cannot connect to server. Is the backend running?'); }
+      else { toast.error('Registration failed. Please try again.'); }
+    } finally { setLoading(false); }
   }
 
-  function handleNameSubmit() {
-    emailRef.current?.focus();
-  }
-
-  function handleEmailSubmit() {
-    passwordRef.current?.focus();
-  }
-
-  function handlePasswordSubmit() {
-    handleRegister();
-  }
+  function handleNameSubmit() { emailRef.current?.focus(); }
+  function handleEmailSubmit() { passwordRef.current?.focus(); }
+  function handlePasswordSubmit() { handleRegister(); }
 
   return (
-    <View style={styles.outer}>
-      <View style={[styles.container, isWeb && styles.containerWeb, { maxWidth: maxContentWidth, paddingHorizontal: contentPadding }]}>
-        <Text style={styles.title}>Create Account</Text>
+    <View style={[s.outer, { backgroundColor: colors.bg }]}>
+      <View style={[s.container, isWeb && s.containerWeb, { maxWidth: maxContentWidth, paddingHorizontal: contentPadding, backgroundColor: colors.surface, shadowColor: colors.shadowColor }]}>
+        <Text style={[s.title, { color: colors.primary }]}>Create Account</Text>
 
-        <Text style={styles.label}>Full Name</Text>
+        <Text style={[s.label, { color: colors.text }]}>Full Name</Text>
         <TextInput
-          style={styles.input}
+          style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
           placeholder="Full Name"
           value={name}
           onChangeText={setName}
           onSubmitEditing={handleNameSubmit}
           returnKeyType="next"
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.textMuted}
         />
 
-        <Text style={styles.label}>Email</Text>
+        <Text style={[s.label, { color: colors.text }]}>Email</Text>
         <TextInput
           ref={emailRef}
-          style={styles.input}
+          style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
           placeholder="Email"
           value={email}
           onChangeText={setEmail}
@@ -100,134 +71,65 @@ export default function RegisterScreen() {
           returnKeyType="next"
           autoCapitalize="none"
           keyboardType="email-address"
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.textMuted}
         />
 
-        <Text style={styles.label}>Password</Text>
-        <View style={styles.passwordWrap}>
+        <Text style={[s.label, { color: colors.text }]}>Password</Text>
+        <View style={s.passwordWrap}>
           <TextInput
             ref={passwordRef}
-            style={styles.passwordInput}
+            style={[s.passwordInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
             placeholder="Min 6 characters"
             value={password}
             onChangeText={setPassword}
             onSubmitEditing={handlePasswordSubmit}
             returnKeyType="done"
             secureTextEntry={!showPassword}
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textMuted}
           />
           <TouchableOpacity
-            style={styles.eyeBtn}
+            style={[s.eyeBtn, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
             onPress={() => setShowPassword(!showPassword)}
             activeOpacity={0.7}
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            accessibilityRole="button"
           >
-            <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+            <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={[s.button, loading && s.buttonDisabled, { backgroundColor: colors.primary }]}
           onPress={handleRegister}
           disabled={loading}
+          accessibilityLabel="Sign Up"
         >
-          <Text style={styles.buttonText}>{loading ? 'Creating...' : 'Sign Up'}</Text>
+          <Text style={[s.buttonText, { color: colors.primaryText }]}>{loading ? 'Creating...' : 'Sign Up'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={s.linkWrap} onPress={() => navigation.navigate('Login')}>
+          <Text style={[s.link, { color: colors.primary }]}>Already have an account? <Text style={s.linkBold}>Login</Text></Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-  },
-  container: {
-    backgroundColor: '#fff',
-    padding: 24,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  containerWeb: {
-    alignSelf: 'center',
-    marginHorizontal: 'auto',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 28,
-    color: '#007AFF',
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
-  },
-  input: {
-    height: 50,
-    borderColor: '#e0e0e0',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    fontSize: 16,
-    backgroundColor: '#fafafa',
-  },
-  passwordWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  passwordInput: {
-    flex: 1,
-    height: 50,
-    borderColor: '#e0e0e0',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: '#fafafa',
-    borderTopRightRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  eyeBtn: {
-    height: 50,
-    width: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fafafa',
-    borderColor: '#e0e0e0',
-    borderWidth: 1,
-    borderLeftWidth: 0,
-    borderRadius: 10,
-    borderTopLeftRadius: 0,
-    borderBottomLeftRadius: 0,
-  },
-  eyeIcon: {
-    fontSize: 18,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+const s = StyleSheet.create({
+  outer: { flex: 1, justifyContent: 'center' },
+  container: { padding: 24, borderRadius: 16, marginHorizontal: 16, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  containerWeb: { alignSelf: 'center', marginHorizontal: 'auto' },
+  title: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 28 },
+  label: { fontSize: 14, fontWeight: '600', marginBottom: 6 },
+  input: { height: 50, borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, marginBottom: 16, fontSize: 16 },
+  passwordWrap: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  passwordInput: { flex: 1, height: 50, borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, fontSize: 16, borderTopRightRadius: 0, borderBottomRightRadius: 0 },
+  eyeBtn: { height: 50, width: 48, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderLeftWidth: 0, borderRadius: 10, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
+  eyeIcon: { fontSize: 18 },
+  button: { borderRadius: 10, height: 50, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { fontSize: 16, fontWeight: '600' },
+  linkWrap: { marginTop: 20, alignItems: 'center' },
+  link: { fontSize: 14 },
+  linkBold: { fontWeight: '700' },
 });

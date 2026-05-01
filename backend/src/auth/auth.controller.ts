@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt.guard';
+import { AdminGuard } from './admin.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -27,5 +28,11 @@ export class AuthController {
   @Get('me')
   async getCurrentUser(@Req() req) {
     return this.authService.getUserById(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Get('users')
+  async listUsers() {
+    return this.authService.findAllUsers();
   }
 }

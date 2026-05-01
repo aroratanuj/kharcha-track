@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Expense } from '../entities/expense.entity';
+import { MongooseModule } from '@nestjs/mongoose';
+import { Expense, ExpenseSchema } from '../schemas/expense.schema';
 import { EmailService } from './email.service';
 import { EmailController } from './email.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Expense])],
+  imports: [MongooseModule.forFeature([{ name: Expense.name, schema: ExpenseSchema }])],
   controllers: [EmailController],
   providers: [EmailService],
 })

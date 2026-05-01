@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import { useToast } from '../../components/Toast';
-import { useResponsive } from '../../hooks/useResponsive';
-import api from '../../services/api';
+import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../components/Toast';
+import api from '../services/api';
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 interface Expense {
   id: string;
@@ -20,15 +16,18 @@ interface Expense {
   merchantName: string;
   category: { id: string; name: string; color: string; icon: string } | null;
   accountSource: string;
-  status: 'draft' | 'confirmed';
+  status: string;
+  userId?: string;
+  user?: { id: string; name: string; email: string } | null;
 }
 
-export default function DraftExpensesScreen() {
+export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
   const toast = useToast();
-  const { isWeb } = useResponsive();
+  const isAdmin = user?.role === 'admin';
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,16 +36,25 @@ export default function DraftExpensesScreen() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
+  const availableYears = useMemo(() => {
+    const years = new Set(allExpenses.map(e => new Date(e.date).getFullYear()));
+    years.add(now.getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [allExpenses]);
+
   useEffect(() => { loadExpenses(); }, []);
 
   async function loadExpenses() {
+    setLoading(true);
     try {
-      const response = await api.get('/expenses');
+      const url = isAdmin ? '/expenses/all' : '/expenses';
+      const response = await api.get(url);
       setAllExpenses(response.data);
-    } catch (error: any) {
-      if (error.message?.includes('Network')) toast.error('Cannot connect to server');
-      else toast.error('Failed to load expenses');
-    } finally { setLoading(false); }
+    } catch {
+      toast.error('Failed to load expenses');
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -58,6 +66,9 @@ export default function DraftExpensesScreen() {
     setExpenses(filtered);
   }, [allExpenses, selectedMonth, selectedYear]);
 
+  const totalAmount = useMemo(() => expenses.reduce((s, e) => s + Number(e.amount), 0), [expenses]);
+  const isCurrentMonth = selectedMonth === now.getMonth() + 1 && selectedYear === now.getFullYear();
+
   function handlePrevMonth() {
     if (selectedMonth === 1) { setSelectedMonth(12); setSelectedYear(y => y - 1); }
     else setSelectedMonth(m => m - 1);
@@ -67,12 +78,37 @@ export default function DraftExpensesScreen() {
     else setSelectedMonth(m => m + 1);
   }
 
-  const isCurrentMonth = selectedMonth === now.getMonth() + 1 && selectedYear === now.getFullYear();
-  const totalAmount = useMemo(() => expenses.reduce((sum, e) => sum + Number(e.amount), 0), [expenses]);
-
-  async function handleConfirmExpense(id: string) {
-    try { await api.post(`/expenses/${id}/confirm`); toast.success('Expense confirmed'); await loadExpenses(); }
-    catch (e: any) { toast.error(e.response?.data?.message || 'Failed to confirm'); }
+  function renderCard({ item }: { item: Expense }) {
+    const d = new Date(item.date);
+    const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const accIcon = item.accountSource === 'UPI' ? '📱' : item.accountSource === 'Card' ? '💳' : item.accountSource === 'Cash' ? '💵' : '🏦';
+    return (
+      <TouchableOpacity style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('ExpenseForm', { expense: item })}>
+        <View style={s.cardHeader}>
+          <View style={s.cardCat}>
+            <Text style={s.cardCatIcon}>{item.category?.icon || '📦'}</Text>
+            <Text style={[s.cardCatName, { color: colors.textSecondary }]}>{item.category?.name || 'Uncategorized'}</Text>
+          </View>
+          <View style={[s.badge, { backgroundColor: item.status === 'confirmed' ? (isDark ? '#1a3a2a' : '#E8F8EF') : (isDark ? '#3a3520' : '#FFF8E1') }]}>
+            <Text style={[s.badgeText, { color: item.status === 'confirmed' ? colors.success : colors.warning }]}>{item.status === 'confirmed' ? 'Confirmed' : 'Draft'}</Text>
+          </View>
+        </View>
+        <Text style={[s.cardDesc, { color: colors.text }]}>{item.description}</Text>
+        {isAdmin && item.user && <Text style={[s.cardUser, { color: colors.textMuted }]}>{item.user.name}</Text>}
+        <View style={s.cardFooter}>
+          <Text style={[s.cardAmount, { color: colors.primary }]}>₹{Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+          <View style={s.cardRight}>
+            {item.merchantName ? <Text style={[s.cardMerchant, { color: colors.textMuted }]}>{item.merchantName}</Text> : null}
+            <Text style={[s.cardDate, { color: colors.textMuted }]}>{dateStr}</Text>
+          </View>
+        </View>
+        {item.accountSource ? (
+          <View style={[s.cardMeta, { borderTopColor: colors.border }]}>
+            <Text style={[s.cardMetaText, { color: colors.textMuted }]}>{accIcon} {item.accountSource}</Text>
+          </View>
+        ) : null}
+      </TouchableOpacity>
+    );
   }
 
   return (
@@ -102,42 +138,7 @@ export default function DraftExpensesScreen() {
           refreshing={loading}
           contentContainerStyle={{ paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadExpenses} tintColor={colors.primary} colors={[colors.primary]} />}
-          renderItem={({ item }) => {
-            const d = new Date(item.date);
-            const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-            const accIcon = item.accountSource === 'UPI' ? '📱' : item.accountSource === 'Card' ? '💳' : item.accountSource === 'Cash' ? '💵' : '🏦';
-            return (
-              <TouchableOpacity style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('ExpenseForm', { expense: item })}>
-                <View style={s.cardHeader}>
-                  <View style={s.cardCat}>
-                    <Text style={s.cardCatIcon}>{item.category?.icon || '📦'}</Text>
-                    <Text style={[s.cardCatName, { color: colors.textSecondary }]}>{item.category?.name || 'Uncategorized'}</Text>
-                  </View>
-                  <View style={[s.badge, { backgroundColor: item.status === 'confirmed' ? (isDark ? '#1a3a2a' : '#E8F8EF') : (isDark ? '#3a3520' : '#FFF8E1') }]}>
-                    <Text style={[s.badgeText, { color: item.status === 'confirmed' ? colors.success : colors.warning }]}>{item.status === 'confirmed' ? 'Confirmed' : 'Draft'}</Text>
-                  </View>
-                </View>
-                <Text style={[s.cardDesc, { color: colors.text }]}>{item.description}</Text>
-                <View style={s.cardFooter}>
-                  <Text style={[s.cardAmount, { color: colors.primary }]}>₹{Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-                  <View style={s.cardRight}>
-                    {item.merchantName ? <Text style={[s.cardMerchant, { color: colors.textMuted }]}>{item.merchantName}</Text> : null}
-                    <Text style={[s.cardDate, { color: colors.textMuted }]}>{dateStr}</Text>
-                  </View>
-                </View>
-                {item.accountSource ? (
-                  <View style={[s.cardMeta, { borderTopColor: colors.border }]}>
-                    <Text style={[s.cardMetaText, { color: colors.textMuted }]}>{accIcon} {item.accountSource}</Text>
-                  </View>
-                ) : null}
-                {item.status === 'draft' && (
-                  <TouchableOpacity style={[s.confirmBtn, { backgroundColor: colors.success }]} onPress={(e) => { e.stopPropagation(); handleConfirmExpense(item.id); }}>
-                    <Text style={s.confirmBtnText}>Confirm</Text>
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            );
-          }}
+          renderItem={renderCard}
           ListEmptyComponent={
             <View style={s.empty}>
               <Text style={s.emptyIcon}>📊</Text>
@@ -168,7 +169,7 @@ const s = StyleSheet.create({
   summary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   summaryLabel: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
   summaryAmount: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
-  card: { marginHorizontal: 12, marginVertical: 6, padding: 14, borderRadius: 12, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  card: { marginHorizontal: 12, marginVertical: 5, padding: 14, borderRadius: 12, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   cardCat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cardCatIcon: { fontSize: 16 },
@@ -176,15 +177,14 @@ const s = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   badgeText: { fontSize: 11, fontWeight: '600' },
   cardDesc: { fontSize: 15, fontWeight: '500', marginBottom: 6 },
+  cardUser: { fontSize: 12, marginBottom: 4, fontStyle: 'italic' },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   cardAmount: { fontSize: 18, fontWeight: 'bold' },
   cardRight: { alignItems: 'flex-end', gap: 2 },
   cardMerchant: { fontSize: 12 },
   cardDate: { fontSize: 11 },
-  cardMeta: { marginTop: 8, paddingTop: 8, borderTopWidth: 1 },
+  cardMeta: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
   cardMetaText: { fontSize: 12 },
-  confirmBtn: { marginTop: 10, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignItems: 'center', minHeight: 44, justifyContent: 'center' },
-  confirmBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 50 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 6 },
