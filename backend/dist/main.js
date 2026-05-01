@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@nestjs/core");
 const common_1 = require("@nestjs/common");
 const app_module_1 = require("./app.module");
+const log_level_middleware_1 = require("./common/log-level.middleware");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.enableCors({
@@ -20,10 +21,12 @@ async function bootstrap() {
         transform: true,
     }));
     app.setGlobalPrefix('api');
+    app.use(new log_level_middleware_1.LogLevelMiddleware());
     const port = process.env.PORT || 3000;
     await app.listen(port);
     console.log(`🚀 KTS Backend is running on: http://localhost:${port}`);
     console.log(`📧 Email webhook endpoint: http://localhost:${port}/api/email/webhook`);
+    console.log(`📝 Log level: ${process.env.LOG_LEVEL || 'ERROR'}`);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

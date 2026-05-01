@@ -10,6 +10,7 @@ export declare class AuthService {
             id: string;
             email: string;
             name: string;
+            role: string;
         };
         token: string;
     }>;
@@ -18,6 +19,7 @@ export declare class AuthService {
             id: string;
             email: string;
             name: string;
+            role: string;
         };
         token: string;
     }>;
@@ -25,6 +27,7 @@ export declare class AuthService {
         id: string;
         email: string;
         name: string;
+        role: string;
     }>;
     private generateToken;
 }

@@ -21,9 +21,8 @@ let CategoriesService = class CategoriesService {
     constructor(categoryRepository) {
         this.categoryRepository = categoryRepository;
     }
-    async findAll(userId) {
+    async findAll() {
         return this.categoryRepository.find({
-            where: { userId },
             order: { createdAt: 'ASC' },
         });
     }

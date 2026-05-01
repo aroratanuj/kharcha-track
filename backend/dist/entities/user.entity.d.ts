@@ -6,6 +6,7 @@ export declare class User {
     email: string;
     passwordHash: string;
     fullName: string;
+    role: string;
     createdAt: Date;
     updatedAt: Date;
     expenses: Expense[];

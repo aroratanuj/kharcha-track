@@ -1,11 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { LogLevelMiddleware } from './common/log-level.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS for mobile and web apps
   app.enableCors({
     origin: [
       'http://localhost:8081',
@@ -16,7 +16,6 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -25,14 +24,15 @@ async function bootstrap() {
     })
   );
 
-  // Global prefix
   app.setGlobalPrefix('api');
+  app.use(new LogLevelMiddleware());
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
   console.log(`🚀 KTS Backend is running on: http://localhost:${port}`);
   console.log(`📧 Email webhook endpoint: http://localhost:${port}/api/email/webhook`);
+  console.log(`📝 Log level: ${process.env.LOG_LEVEL || 'ERROR'}`);
 }
 
 bootstrap();

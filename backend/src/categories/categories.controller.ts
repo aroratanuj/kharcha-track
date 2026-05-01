@@ -8,8 +8,8 @@ export class CategoriesController {
   constructor(private categoriesService: CategoriesService) {}
 
   @Get()
-  async findAll(@Req() req) {
-    return this.categoriesService.findAll(req.user.userId);
+  async findAll() {
+    return this.categoriesService.findAll();
   }
 
   @Post()

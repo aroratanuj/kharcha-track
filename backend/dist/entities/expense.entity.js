@@ -13,6 +13,7 @@ exports.Expense = exports.ExpenseStatus = void 0;
 const typeorm_1 = require("typeorm");
 const user_entity_1 = require("./user.entity");
 const category_entity_1 = require("./category.entity");
+const account_source_enum_1 = require("../constants/account-source.enum");
 var ExpenseStatus;
 (function (ExpenseStatus) {
     ExpenseStatus["DRAFT"] = "draft";
@@ -58,6 +59,18 @@ __decorate([
     (0, typeorm_1.JoinColumn)({ name: 'category_id' }),
     __metadata("design:type", category_entity_1.Category)
 ], Expense.prototype, "category", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: 'enum',
+        enum: account_source_enum_1.AccountSource,
+        nullable: true,
+    }),
+    __metadata("design:type", String)
+], Expense.prototype, "accountSource", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 250, nullable: true }),
+    __metadata("design:type", String)
+], Expense.prototype, "notes", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'user_id' }),
     __metadata("design:type", String)

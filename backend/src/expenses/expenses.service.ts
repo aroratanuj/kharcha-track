@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Expense, ExpenseStatus } from '../entities/expense.entity';
 import { Category } from '../entities/category.entity';
+import { AccountSource } from '../constants/account-source.enum';
 
 @Injectable()
 export class ExpensesService {
@@ -21,10 +22,12 @@ export class ExpensesService {
     date: Date,
     categoryId?: string,
     status: ExpenseStatus = ExpenseStatus.CONFIRMED,
+    accountSource?: AccountSource,
+    notes?: string,
   ) {
     if (categoryId) {
       const category = await this.categoryRepository.findOne({
-        where: { id: categoryId, userId },
+        where: { id: categoryId },
       });
       if (!category) {
         throw new NotFoundException('Category not found');
@@ -39,6 +42,8 @@ export class ExpensesService {
       date,
       categoryId,
       status,
+      accountSource,
+      notes,
     });
 
     return this.expenseRepository.save(expense);
@@ -55,6 +60,24 @@ export class ExpensesService {
     }
 
     return query.orderBy('expense.createdAt', 'DESC').getMany();
+  }
+
+  async findAllAdmin(userId?: string, status?: ExpenseStatus) {
+    const query = this.expenseRepository
+      .createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.category', 'category')
+      .leftJoinAndSelect('expense.user', 'user')
+      .orderBy('expense.createdAt', 'DESC');
+
+    if (userId) {
+      query.andWhere('expense.userId = :userId', { userId });
+    }
+
+    if (status) {
+      query.andWhere('expense.status = :status', { status });
+    }
+
+    return query.getMany();
   }
 
   async findOne(id: string, userId: string) {
@@ -75,7 +98,7 @@ export class ExpensesService {
 
     if (updates.categoryId) {
       const category = await this.categoryRepository.findOne({
-        where: { id: updates.categoryId, userId },
+        where: { id: updates.categoryId },
       });
 
       if (!category) {
@@ -104,8 +127,11 @@ export class ExpensesService {
     return this.expenseRepository.save(expense);
   }
 
-  async delete(id: string, userId: string) {
-    const expense = await this.findOne(id, userId);
+  async delete(id: string) {
+    const expense = await this.expenseRepository.findOne({ where: { id } });
+    if (!expense) {
+      throw new NotFoundException('Expense not found');
+    }
     await this.expenseRepository.remove(expense);
     return { message: 'Expense deleted successfully' };
   }

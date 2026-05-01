@@ -17,10 +17,10 @@ export class Category {
   @Column({ name: 'icon', nullable: true })
   icon: string;
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', nullable: true })
   userId: string;
 
-  @ManyToOne(() => User, (user) => user.categories, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, (user) => user.categories, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'user_id' })
   user: User;
 

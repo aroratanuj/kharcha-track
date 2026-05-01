@@ -1,7 +1,9 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import { AdminGuard } from '../auth/admin.guard';
 import { ExpenseStatus } from '../entities/expense.entity';
+import { AccountSource } from '../constants/account-source.enum';
 
 @Controller('expenses')
 @UseGuards(JwtAuthGuard)
@@ -16,6 +18,8 @@ export class ExpensesController {
     @Body('date') date?: string,
     @Body('categoryId') categoryId?: string,
     @Body('status') status?: ExpenseStatus,
+    @Body('accountSource') accountSource?: AccountSource,
+    @Body('notes') notes?: string,
     @Req() req?: any,
   ) {
     return this.expensesService.create(
@@ -26,12 +30,20 @@ export class ExpensesController {
       date ? new Date(date) : new Date(),
       categoryId,
       status || ExpenseStatus.CONFIRMED,
+      accountSource,
+      notes,
     );
   }
 
   @Get()
   async findAll(@Req() req, @Query('status') status?: ExpenseStatus) {
     return this.expensesService.findAll(req.user.userId, status);
+  }
+
+  @Get('all')
+  @UseGuards(AdminGuard)
+  async findAllAdmin(@Query('userId') userId?: string, @Query('status') status?: ExpenseStatus) {
+    return this.expensesService.findAllAdmin(userId, status);
   }
 
   @Get(':id')
@@ -54,8 +66,9 @@ export class ExpensesController {
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string, @Req() req) {
-    return this.expensesService.delete(id, req.user.userId);
+  @UseGuards(AdminGuard)
+  async delete(@Param('id') id: string) {
+    return this.expensesService.delete(id);
   }
 
   @Post('bulk-confirm')

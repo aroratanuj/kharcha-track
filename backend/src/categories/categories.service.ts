@@ -10,9 +10,8 @@ export class CategoriesService {
     private categoryRepository: Repository<Category>,
   ) {}
 
-  async findAll(userId: string) {
+  async findAll() {
     return this.categoryRepository.find({
-      where: { userId },
       order: { createdAt: 'ASC' },
     });
   }

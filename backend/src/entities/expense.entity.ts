@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from './user.entity';
 import { Category } from './category.entity';
+import { AccountSource } from '../constants/account-source.enum';
 
 export enum ExpenseStatus {
   DRAFT = 'draft',
@@ -37,6 +38,16 @@ export class Expense {
   @ManyToOne(() => Category, (category) => category.expenses, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'category_id' })
   category: Category;
+
+  @Column({
+    type: 'enum',
+    enum: AccountSource,
+    nullable: true,
+  })
+  accountSource: AccountSource;
+
+  @Column({ type: 'varchar', length: 250, nullable: true })
+  notes: string;
 
   @Column({ name: 'user_id' })
   userId: string;

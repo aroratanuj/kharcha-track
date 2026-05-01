@@ -23,10 +23,10 @@ let ExpensesService = class ExpensesService {
         this.expenseRepository = expenseRepository;
         this.categoryRepository = categoryRepository;
     }
-    async create(userId, amount, description, merchantName, date, categoryId, status = expense_entity_1.ExpenseStatus.CONFIRMED) {
+    async create(userId, amount, description, merchantName, date, categoryId, status = expense_entity_1.ExpenseStatus.CONFIRMED, accountSource, notes) {
         if (categoryId) {
             const category = await this.categoryRepository.findOne({
-                where: { id: categoryId, userId },
+                where: { id: categoryId },
             });
             if (!category) {
                 throw new common_1.NotFoundException('Category not found');
@@ -40,6 +40,8 @@ let ExpensesService = class ExpensesService {
             date,
             categoryId,
             status,
+            accountSource,
+            notes,
         });
         return this.expenseRepository.save(expense);
     }
@@ -52,6 +54,20 @@ let ExpensesService = class ExpensesService {
             query.andWhere('expense.status = :status', { status });
         }
         return query.orderBy('expense.createdAt', 'DESC').getMany();
+    }
+    async findAllAdmin(userId, status) {
+        const query = this.expenseRepository
+            .createQueryBuilder('expense')
+            .leftJoinAndSelect('expense.category', 'category')
+            .leftJoinAndSelect('expense.user', 'user')
+            .orderBy('expense.createdAt', 'DESC');
+        if (userId) {
+            query.andWhere('expense.userId = :userId', { userId });
+        }
+        if (status) {
+            query.andWhere('expense.status = :status', { status });
+        }
+        return query.getMany();
     }
     async findOne(id, userId) {
         const expense = await this.expenseRepository.findOne({
@@ -67,7 +83,7 @@ let ExpensesService = class ExpensesService {
         const expense = await this.findOne(id, userId);
         if (updates.categoryId) {
             const category = await this.categoryRepository.findOne({
-                where: { id: updates.categoryId, userId },
+                where: { id: updates.categoryId },
             });
             if (!category) {
                 throw new common_1.NotFoundException('Category not found');
@@ -87,8 +103,11 @@ let ExpensesService = class ExpensesService {
         }
         return this.expenseRepository.save(expense);
     }
-    async delete(id, userId) {
-        const expense = await this.findOne(id, userId);
+    async delete(id) {
+        const expense = await this.expenseRepository.findOne({ where: { id } });
+        if (!expense) {
+            throw new common_1.NotFoundException('Expense not found');
+        }
         await this.expenseRepository.remove(expense);
         return { message: 'Expense deleted successfully' };
     }

@@ -67,14 +67,16 @@ let AuthService = class AuthService {
             email,
             passwordHash,
             fullName,
+            role: 'user',
         });
         await this.userRepository.save(user);
-        const token = this.generateToken(user.id, user.email);
+        const token = this.generateToken(user.id, user.email, user.role);
         return {
             user: {
                 id: user.id,
                 email: user.email,
                 name: user.fullName,
+                role: user.role,
             },
             token,
         };
@@ -88,12 +90,13 @@ let AuthService = class AuthService {
         if (!isPasswordValid) {
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
-        const token = this.generateToken(user.id, user.email);
+        const token = this.generateToken(user.id, user.email, user.role);
         return {
             user: {
                 id: user.id,
                 email: user.email,
                 name: user.fullName,
+                role: user.role,
             },
             token,
         };
@@ -107,10 +110,11 @@ let AuthService = class AuthService {
             id: user.id,
             email: user.email,
             name: user.fullName,
+            role: user.role,
         };
     }
-    generateToken(userId, email) {
-        const payload = { sub: userId, email };
+    generateToken(userId, email, role = 'user') {
+        const payload = { sub: userId, email, role };
         return this.jwtService.sign(payload);
     }
 };

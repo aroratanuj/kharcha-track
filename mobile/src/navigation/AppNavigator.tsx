@@ -4,8 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import DraftExpensesScreen from '../screens/expenses/DraftExpensesScreen';
+import ExpenseFormScreen from '../screens/expenses/ExpenseFormScreen';
 import BudgetDashboardScreen from '../screens/budget/BudgetDashboardScreen';
 import AnalyticsDashboardScreen from '../screens/analytics/AnalyticsDashboardScreen';
+import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 
 const Stack = createStackNavigator();
 
@@ -13,7 +15,7 @@ export default function AppNavigator() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return null; // Or a loading screen
+    return null;
   }
 
   return (
@@ -32,6 +34,11 @@ export default function AppNavigator() {
               options={{ title: 'Review Queue', headerLeft: null }}
             />
             <Stack.Screen
+              name="ExpenseForm"
+              component={ExpenseFormScreen}
+              options={{ title: 'Add Expense' }}
+            />
+            <Stack.Screen
               name="BudgetDashboard"
               component={BudgetDashboardScreen}
               options={{ title: 'Budgets' }}
@@ -41,6 +48,13 @@ export default function AppNavigator() {
               component={AnalyticsDashboardScreen}
               options={{ title: 'Analytics' }}
             />
+            {user.role === 'admin' && (
+              <Stack.Screen
+                name="AdminDashboard"
+                component={AdminDashboardScreen}
+                options={{ title: 'Admin Dashboard' }}
+              />
+            )}
           </>
         )}
       </Stack.Navigator>

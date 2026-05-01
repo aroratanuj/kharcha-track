@@ -16,16 +16,21 @@ exports.ExpensesController = void 0;
 const common_1 = require("@nestjs/common");
 const expenses_service_1 = require("./expenses.service");
 const jwt_guard_1 = require("../auth/jwt.guard");
+const admin_guard_1 = require("../auth/admin.guard");
 const expense_entity_1 = require("../entities/expense.entity");
+const account_source_enum_1 = require("../constants/account-source.enum");
 let ExpensesController = class ExpensesController {
     constructor(expensesService) {
         this.expensesService = expensesService;
     }
-    async create(amount, description, merchantName, date, categoryId, status, req) {
-        return this.expensesService.create(req.user.userId, amount, description, merchantName, date ? new Date(date) : new Date(), categoryId, status || expense_entity_1.ExpenseStatus.CONFIRMED);
+    async create(amount, description, merchantName, date, categoryId, status, accountSource, notes, req) {
+        return this.expensesService.create(req.user.userId, amount, description, merchantName, date ? new Date(date) : new Date(), categoryId, status || expense_entity_1.ExpenseStatus.CONFIRMED, accountSource, notes);
     }
     async findAll(req, status) {
         return this.expensesService.findAll(req.user.userId, status);
+    }
+    async findAllAdmin(userId, status) {
+        return this.expensesService.findAllAdmin(userId, status);
     }
     async findOne(id, req) {
         return this.expensesService.findOne(id, req.user.userId);
@@ -36,8 +41,8 @@ let ExpensesController = class ExpensesController {
     async confirm(id, req) {
         return this.expensesService.confirm(id, req.user.userId);
     }
-    async delete(id, req) {
-        return this.expensesService.delete(id, req.user.userId);
+    async delete(id) {
+        return this.expensesService.delete(id);
     }
     async bulkConfirm(ids, req) {
         return this.expensesService.bulkConfirm(ids, req.user.userId);
@@ -52,9 +57,11 @@ __decorate([
     __param(3, (0, common_1.Body)('date')),
     __param(4, (0, common_1.Body)('categoryId')),
     __param(5, (0, common_1.Body)('status')),
-    __param(6, (0, common_1.Req)()),
+    __param(6, (0, common_1.Body)('accountSource')),
+    __param(7, (0, common_1.Body)('notes')),
+    __param(8, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, String, String, String, String, String, Object]),
+    __metadata("design:paramtypes", [Number, String, String, String, String, String, String, String, Object]),
     __metadata("design:returntype", Promise)
 ], ExpensesController.prototype, "create", null);
 __decorate([
@@ -65,6 +72,15 @@ __decorate([
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], ExpensesController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('all'),
+    (0, common_1.UseGuards)(admin_guard_1.AdminGuard),
+    __param(0, (0, common_1.Query)('userId')),
+    __param(1, (0, common_1.Query)('status')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], ExpensesController.prototype, "findAllAdmin", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
@@ -92,10 +108,10 @@ __decorate([
 ], ExpensesController.prototype, "confirm", null);
 __decorate([
     (0, common_1.Delete)(':id'),
+    (0, common_1.UseGuards)(admin_guard_1.AdminGuard),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], ExpensesController.prototype, "delete", null);
 __decorate([

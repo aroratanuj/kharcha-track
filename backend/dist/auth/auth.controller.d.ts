@@ -7,6 +7,7 @@ export declare class AuthController {
             id: string;
             email: string;
             name: string;
+            role: string;
         };
         token: string;
     }>;
@@ -15,6 +16,7 @@ export declare class AuthController {
             id: string;
             email: string;
             name: string;
+            role: string;
         };
         token: string;
     }>;
@@ -22,5 +24,6 @@ export declare class AuthController {
         id: string;
         email: string;
         name: string;
+        role: string;
     }>;
 }

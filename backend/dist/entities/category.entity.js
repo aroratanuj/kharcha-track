@@ -34,11 +34,11 @@ __decorate([
     __metadata("design:type", String)
 ], Category.prototype, "icon", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'user_id' }),
+    (0, typeorm_1.Column)({ name: 'user_id', nullable: true }),
     __metadata("design:type", String)
 ], Category.prototype, "userId", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, (user) => user.categories, { onDelete: 'CASCADE' }),
+    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, (user) => user.categories, { onDelete: 'CASCADE', nullable: true }),
     (0, typeorm_1.JoinColumn)({ name: 'user_id' }),
     __metadata("design:type", user_entity_1.User)
 ], Category.prototype, "user", void 0);

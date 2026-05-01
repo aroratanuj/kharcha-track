@@ -20,8 +20,8 @@ let CategoriesController = class CategoriesController {
     constructor(categoriesService) {
         this.categoriesService = categoriesService;
     }
-    async findAll(req) {
-        return this.categoriesService.findAll(req.user.userId);
+    async findAll() {
+        return this.categoriesService.findAll();
     }
     async create(name, color, icon, req) {
         return this.categoriesService.create(req.user.userId, name, color, icon);
@@ -36,9 +36,8 @@ let CategoriesController = class CategoriesController {
 exports.CategoriesController = CategoriesController;
 __decorate([
     (0, common_1.Get)(),
-    __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], CategoriesController.prototype, "findAll", null);
 __decorate([
