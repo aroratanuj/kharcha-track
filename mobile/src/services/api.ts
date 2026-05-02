@@ -1,7 +1,11 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+if (__DEV__ !== true && API_BASE_URL.startsWith('http://')) {
+  throw new Error('API_BASE_URL must use HTTPS in production');
+}
 
 let navigateToLogin: (() => void) | null = null;
 
@@ -16,7 +20,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('@KTS:token');
+    const token = await SecureStore.getItemAsync('@KTS:token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -26,14 +30,14 @@ api.interceptors.request.use(
 );
 
 api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('@KTS:token');
-      if (navigateToLogin) navigateToLogin();
-    }
-    return Promise.reject(error);
-  },
-);
+    (response) => response,
+    async (error) => {
+      if (error.response?.status === 401) {
+        await SecureStore.deleteItemAsync('@KTS:token');
+        if (navigateToLogin) navigateToLogin();
+      }
+      return Promise.reject(error);
+    },
+  );
 
 export default api;

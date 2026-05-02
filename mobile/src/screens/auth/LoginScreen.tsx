@@ -6,6 +6,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/Toast';
 import { useResponsive } from '../../hooks/useResponsive';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,23 +22,15 @@ export default function LoginScreen() {
   const passwordRef = useRef<TextInput>(null);
 
   async function handleLogin() {
-    if (!email.trim()) {
-      toast.error('Email is required');
-      return;
-    }
-    if (!password) {
-      toast.error('Password is required');
-      return;
-    }
+    if (!email.trim()) { toast.error('Email is required'); return; }
+    if (!EMAIL_REGEX.test(email)) { toast.error('Enter a valid email address'); return; }
+    if (!password) { toast.error('Password is required'); return; }
     setLoading(true);
     try {
       await signIn(email, password);
       toast.success('Logged in successfully');
     } catch (error: any) {
-      const msg = error.response?.data?.message;
-      if (msg) {
-        toast.error(msg);
-      } else if (error.message?.includes('Network')) {
+      if (error.message?.includes('Network')) {
         toast.error('Cannot connect to server. Is the backend running?');
       } else {
         toast.error('Login failed. Please try again.');
@@ -66,6 +60,9 @@ export default function LoginScreen() {
           autoCapitalize="none"
           keyboardType="email-address"
           placeholderTextColor={colors.textMuted}
+          maxLength={254}
+          autoComplete="email"
+          textContentType="emailAddress"
         />
 
         <Text style={[s.label, { color: colors.text }]}>Password</Text>
@@ -80,6 +77,7 @@ export default function LoginScreen() {
             returnKeyType="done"
             secureTextEntry={!showPassword}
             placeholderTextColor={colors.textMuted}
+            maxLength={128}
           />
           <TouchableOpacity
             style={[s.eyeBtn, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}

@@ -75,7 +75,7 @@ export default function ExpenseFormScreen() {
             const d = new Date(editingExpense.date);
             if (!isNaN(d.getTime())) setDate(`${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`);
           }
-        } catch (e) { console.error('Error parsing expense:', e); }
+        } catch { /* parse error fallback: form stays empty */ }
       }
       setScreenLoading(false);
     })();
@@ -101,8 +101,9 @@ export default function ExpenseFormScreen() {
 
   function validate() {
     const e: Record<string, string> = {};
-    if (!amount || parseFloat(amount) <= 0) e.amount = 'Enter a valid amount';
+    if (!amount || parseFloat(amount) <= 0 || parseFloat(amount) > 999999999) e.amount = 'Enter a valid amount';
     if (!description.trim()) e.description = 'Description is required';
+    if (description.length > 200) e.description = 'Description too long (max 200)';
     if (!categoryId) e.category = 'Select a category';
     if (!date) e.date = 'Date is required';
     if (!accountSource) e.accountSource = 'Select an account';
@@ -110,8 +111,12 @@ export default function ExpenseFormScreen() {
     return Object.keys(e).length === 0;
   }
 
+  const submittingRef = useRef(false);
+
   async function handleSubmit() {
+    if (submittingRef.current) return;
     if (!validate()) return;
+    submittingRef.current = true;
     setLoading(true);
     try {
       const userId = isAdmin ? selectedUserId : user?.id;
@@ -129,8 +134,8 @@ export default function ExpenseFormScreen() {
       toast.success(editingExpense ? 'Expense updated' : 'Expense created');
       navigation.navigate('Home');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save');
-    } finally { setLoading(false); }
+      toast.error('Failed to save expense');
+    } finally { setLoading(false); submittingRef.current = false; }
   }
 
   if (screenLoading) return <View style={[s.loading, { backgroundColor: colors.bg }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
@@ -165,13 +170,13 @@ export default function ExpenseFormScreen() {
 
             <View style={s.field}>
               <Text style={[s.label, { color: colors.text }]}>Amount *</Text>
-              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }, errors.amount && s.inputErr]} value={amount} onChangeText={(v) => { setAmount(v); setErrors({ ...errors, amount: '' }); }} placeholder="0.00" keyboardType="decimal-pad" placeholderTextColor={colors.textMuted} />
+              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }, errors.amount && s.inputErr]} value={amount} onChangeText={(v) => { setAmount(v); setErrors({ ...errors, amount: '' }); }} placeholder="0.00" keyboardType="decimal-pad" placeholderTextColor={colors.textMuted} maxLength={12} />
               {errors.amount && <Text style={s.err}>{errors.amount}</Text>}
             </View>
 
             <View style={s.field}>
               <Text style={[s.label, { color: colors.text }]}>Description *</Text>
-              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }, errors.description && s.inputErr]} value={description} onChangeText={(v) => { setDescription(v); setErrors({ ...errors, description: '' }); }} placeholder="e.g., Lunch at cafe" placeholderTextColor={colors.textMuted} />
+              <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }, errors.description && s.inputErr]} value={description} onChangeText={(v) => { setDescription(v); setErrors({ ...errors, description: '' }); }} placeholder="e.g., Lunch at cafe" placeholderTextColor={colors.textMuted} maxLength={200} />
               {errors.description && <Text style={s.err}>{errors.description}</Text>}
             </View>
 

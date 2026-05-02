@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Category, CategoryDocument } from '../schemas/category.schema';
 
+const ALLOWED_UPDATE_FIELDS = ['name', 'color', 'icon'];
+
 @Injectable()
 export class CategoriesService {
   constructor(
@@ -34,7 +36,12 @@ export class CategoriesService {
       throw new NotFoundException('Category not found');
     }
 
-    Object.assign(category, updates);
+    for (const key of Object.keys(updates)) {
+      if (ALLOWED_UPDATE_FIELDS.includes(key)) {
+        (category as any)[key] = updates[key];
+      }
+    }
+
     await category.save();
     return category;
   }

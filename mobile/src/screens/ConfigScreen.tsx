@@ -137,10 +137,10 @@ function CategoriesManager({ colors, toast }: any) {
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
           <View style={[s.modal, { backgroundColor: colors.surface, shadowColor: colors.shadowColor }]}>
             <Text style={[s.modalTitle, { color: colors.text }]}>{editId ? 'Edit Category' : 'New Category'}</Text>
-            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={name} onChangeText={setName} placeholder="Category name" placeholderTextColor={colors.textMuted} />
-            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={icon} onChangeText={setIcon} placeholder="Icon (e.g. 🍔)" placeholderTextColor={colors.textMuted} />
+            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={name} onChangeText={setName} placeholder="Category name" placeholderTextColor={colors.textMuted} maxLength={50} />
+            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={icon} onChangeText={setIcon} placeholder="Icon (e.g. 🍔)" placeholderTextColor={colors.textMuted} maxLength={10} />
             <View style={s.colorPreviewRow}>
-              <TextInput style={[s.modalInput, s.colorInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={color} onChangeText={setColor} placeholder="Color (e.g. #FF6B6B)" placeholderTextColor={colors.textMuted} />
+              <TextInput style={[s.modalInput, s.colorInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={color} onChangeText={setColor} placeholder="Color (e.g. #FF6B6B)" placeholderTextColor={colors.textMuted} maxLength={7} />
               <View style={[s.colorPreview, { backgroundColor: color || '#007AFF' }]} />
             </View>
             <View style={s.modalActions}>
@@ -209,9 +209,9 @@ function AccountsManager({ colors, toast }: any) {
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
           <View style={[s.modal, { backgroundColor: colors.surface, shadowColor: colors.shadowColor }]}>
             <Text style={[s.modalTitle, { color: colors.text }]}>New Account Type</Text>
-            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={newLabel} onChangeText={setNewLabel} placeholder="Label (e.g. UPI)" placeholderTextColor={colors.textMuted} />
-            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={newIcon} onChangeText={setNewIcon} placeholder="Icon (e.g. 📱)" placeholderTextColor={colors.textMuted} />
-            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={newEnum} onChangeText={setNewEnum} placeholder="Enum value (e.g. Wallet)" placeholderTextColor={colors.textMuted} />
+            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={newLabel} onChangeText={setNewLabel} placeholder="Label (e.g. UPI)" placeholderTextColor={colors.textMuted} maxLength={50} />
+            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={newIcon} onChangeText={setNewIcon} placeholder="Icon (e.g. 📱)" placeholderTextColor={colors.textMuted} maxLength={10} />
+            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={newEnum} onChangeText={setNewEnum} placeholder="Enum value (e.g. Wallet)" placeholderTextColor={colors.textMuted} maxLength={50} />
             <View style={s.modalActions}>
               <TouchableOpacity style={[s.modalBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setModalVisible(false)}><Text style={[s.modalBtnText, { color: colors.text }]}>Cancel</Text></TouchableOpacity>
               <TouchableOpacity style={[s.modalBtn, { backgroundColor: colors.primary }]} onPress={handleAdd}><Text style={s.modalBtnText}>Add</Text></TouchableOpacity>

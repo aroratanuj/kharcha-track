@@ -2,17 +2,28 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { logLevelMiddleware } from './common/log-level.middleware';
+import helmet from 'helmet';
+import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.use(helmet());
+  app.use(express.json({ limit: '1mb' }));
+
+  const allowedOrigins = [
+    'http://localhost:8081',
+    'exp://localhost:19000',
+    'http://localhost:19006',
+    process.env.MOBILE_APP_URL,
+  ].filter(Boolean);
+
+  if (!allowedOrigins.length) {
+    throw new Error('MOBILE_APP_URL must be set in production');
+  }
+
   app.enableCors({
-    origin: [
-      'http://localhost:8081',
-      'exp://localhost:19000',
-      'http://localhost:19006',
-      process.env.MOBILE_APP_URL || '*',
-    ].filter(Boolean),
+    origin: allowedOrigins,
     credentials: true,
   });
 
@@ -29,10 +40,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-
-  console.log(`🚀 KTS Backend is running on: http://localhost:${port}`);
-  console.log(`📧 Email webhook endpoint: http://localhost:${port}/api/email/webhook`);
-  console.log(`📝 Log level: ${process.env.LOG_LEVEL || 'ERROR'}`);
+  console.log(`Server running on port ${port}`);
 }
 
 bootstrap();

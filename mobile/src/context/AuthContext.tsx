@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import api from '../services/api';
 
 interface User {
@@ -29,15 +29,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   async function loadStoredData() {
     try {
-      const token = await AsyncStorage.getItem('@KTS:token');
+      const token = await SecureStore.getItemAsync('@KTS:token');
       if (token) {
         api.defaults.headers.common.Authorization = `Bearer ${token}`;
-        // Verify token and get user data
         const response = await api.get('/auth/me');
         setUser(response.data);
       }
-    } catch (error) {
-      console.error('Failed to load stored data', error);
+    } catch {
+      await SecureStore.deleteItemAsync('@KTS:token');
     } finally {
       setLoading(false);
     }
@@ -47,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const response = await api.post('/auth/login', { email, password });
     const { user, token } = response.data;
 
-    await AsyncStorage.setItem('@KTS:token', token);
+    await SecureStore.setItemAsync('@KTS:token', token);
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
     setUser(user);
   }
@@ -56,13 +55,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const response = await api.post('/auth/register', { email, password, name });
     const { user, token } = response.data;
 
-    await AsyncStorage.setItem('@KTS:token', token);
+    await SecureStore.setItemAsync('@KTS:token', token);
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
     setUser(user);
   }
 
   async function signOut() {
-    await AsyncStorage.removeItem('@KTS:token');
+    await SecureStore.deleteItemAsync('@KTS:token');
     api.defaults.headers.common.Authorization = '';
     setUser(null);
   }

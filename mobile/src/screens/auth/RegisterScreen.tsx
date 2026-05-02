@@ -6,6 +6,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/Toast';
 import { useResponsive } from '../../hooks/useResponsive';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -23,20 +25,22 @@ export default function RegisterScreen() {
 
   async function handleRegister() {
     if (!name.trim()) { toast.error('Name is required'); return; }
-    if (!email.trim()) { toast.error('Email is required'); return; }
-    if (!email.includes('@')) { toast.error('Enter a valid email address'); return; }
+    if (name.length > 100) { toast.error('Name must be 100 characters or less'); return; }
+    if (!EMAIL_REGEX.test(email)) { toast.error('Enter a valid email address'); return; }
     if (!password) { toast.error('Password is required'); return; }
-    if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+    if (password.length < 8) { toast.error('Password must be at least 8 characters'); return; }
+    if (password.length > 128) { toast.error('Password too long'); return; }
 
     setLoading(true);
     try {
       await signUp(email, password, name);
       toast.success('Account created successfully');
     } catch (error: any) {
-      const msg = error.response?.data?.message;
-      if (msg) { toast.error(msg); }
-      else if (error.message?.includes('Network')) { toast.error('Cannot connect to server. Is the backend running?'); }
-      else { toast.error('Registration failed. Please try again.'); }
+      if (error.message?.includes('Network')) {
+        toast.error('Cannot connect to server. Is the backend running?');
+      } else {
+        toast.error('Registration failed. Please try again.');
+      }
     } finally { setLoading(false); }
   }
 
@@ -58,6 +62,8 @@ export default function RegisterScreen() {
           onSubmitEditing={handleNameSubmit}
           returnKeyType="next"
           placeholderTextColor={colors.textMuted}
+          maxLength={100}
+          autoCapitalize="words"
         />
 
         <Text style={[s.label, { color: colors.text }]}>Email</Text>
@@ -72,6 +78,9 @@ export default function RegisterScreen() {
           autoCapitalize="none"
           keyboardType="email-address"
           placeholderTextColor={colors.textMuted}
+          maxLength={254}
+          autoComplete="email"
+          textContentType="emailAddress"
         />
 
         <Text style={[s.label, { color: colors.text }]}>Password</Text>
@@ -79,13 +88,14 @@ export default function RegisterScreen() {
           <TextInput
             ref={passwordRef}
             style={[s.passwordInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-            placeholder="Min 6 characters"
+            placeholder="Min 8 characters"
             value={password}
             onChangeText={setPassword}
             onSubmitEditing={handlePasswordSubmit}
             returnKeyType="done"
             secureTextEntry={!showPassword}
             placeholderTextColor={colors.textMuted}
+            maxLength={128}
           />
           <TouchableOpacity
             style={[s.eyeBtn, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}

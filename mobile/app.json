@@ -32,6 +32,9 @@
       "eas": {
         "projectId": "kts-expense-tracker"
       }
-    }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

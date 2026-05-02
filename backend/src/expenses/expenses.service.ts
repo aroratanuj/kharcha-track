@@ -3,7 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Expense, ExpenseDocument } from '../schemas/expense.schema';
 import { Category, CategoryDocument } from '../schemas/category.schema';
-import { AccountSource } from '../constants/account-source.enum';
+
+const ALLOWED_UPDATE_FIELDS = ['amount', 'description', 'merchantName', 'date', 'categoryId', 'accountSource', 'notes', 'status'];
 
 @Injectable()
 export class ExpensesService {
@@ -35,7 +36,7 @@ export class ExpensesService {
     date: Date,
     categoryId?: string,
     status: string = 'confirmed',
-    accountSource?: AccountSource,
+    accountSource?: string,
     notes?: string,
   ): Promise<any> {
     if (categoryId) {
@@ -69,6 +70,7 @@ export class ExpensesService {
     const expenses = await this.expenseModel
       .find(filter)
       .sort({ createdAt: -1 })
+      .limit(1000)
       .populate<{ categoryId: any }>('categoryId')
       .lean();
 
@@ -98,6 +100,7 @@ export class ExpensesService {
     const expenses = await this.expenseModel
       .find(filter)
       .sort({ createdAt: -1 })
+      .limit(1000)
       .populate<{ categoryId: any; userId: any }>('categoryId userId')
       .lean();
 
@@ -163,11 +166,14 @@ export class ExpensesService {
 
     const mongoUpdates: any = {};
     for (const [key, value] of Object.entries(updates)) {
+      if (!ALLOWED_UPDATE_FIELDS.includes(key)) continue;
       if (key === 'categoryId' && value) {
         mongoUpdates.categoryId = new Types.ObjectId(value as string);
       } else if (key === 'date' && value) {
         mongoUpdates.date = new Date(value as string);
-      } else if (value !== undefined && key !== 'id' && key !== '_id') {
+      } else if (key === 'status') {
+        mongoUpdates.status = value === 'draft' || value === 'confirmed' ? value : expense.status;
+      } else if (value !== undefined) {
         mongoUpdates[key] = value;
       }
     }

@@ -1,14 +1,19 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User, UserDocument } from '../schemas/user.schema';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: 'dev-secret-key-change-in-production',
+      secretOrKey: process.env.JWT_SECRET || 'fallback-dev-key-DO-NOT-USE-IN-PROD',
     });
   }
 
@@ -17,10 +22,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
+    const user = await this.userModel.findById(payload.sub).select('-passwordHash').lean();
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
     return {
-      userId: payload.sub,
-      email: payload.email,
-      role: payload.role || 'user',
+      userId: user._id.toString(),
+      email: user.email,
+      role: user.role,
     };
   }
 }

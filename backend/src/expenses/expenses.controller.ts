@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req 
 import { ExpensesService } from './expenses.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { AdminGuard } from '../auth/admin.guard';
-import { AccountSource } from '../constants/account-source.enum';
+import { CreateExpenseDto, UpdateExpenseDto, BulkConfirmDto } from '../dto';
 
 @Controller('expenses')
 @UseGuards(JwtAuthGuard)
@@ -11,26 +11,19 @@ export class ExpensesController {
 
   @Post()
   async create(
-    @Body('amount') amount: number,
-    @Body('description') description: string,
-    @Body('merchantName') merchantName?: string,
-    @Body('date') date?: string,
-    @Body('categoryId') categoryId?: string,
-    @Body('status') status?: string,
-    @Body('accountSource') accountSource?: AccountSource,
-    @Body('notes') notes?: string,
-    @Req() req?: any,
+    @Body() dto: CreateExpenseDto,
+    @Req() req: any,
   ) {
     return this.expensesService.create(
       req.user.userId,
-      amount,
-      description,
-      merchantName,
-      date ? new Date(date) : new Date(),
-      categoryId,
-      status || 'confirmed',
-      accountSource,
-      notes,
+      dto.amount,
+      dto.description,
+      dto.merchantName,
+      dto.date ? new Date(dto.date) : new Date(),
+      dto.categoryId,
+      dto.status || 'confirmed',
+      dto.accountSource,
+      dto.notes,
     );
   }
 
@@ -53,10 +46,10 @@ export class ExpensesController {
   @Put(':id')
   async update(
     @Param('id') id: string,
-    @Body() updates: any,
+    @Body() dto: UpdateExpenseDto,
     @Req() req: any,
   ): Promise<any> {
-    return this.expensesService.update(id, req.user.userId, updates);
+    return this.expensesService.update(id, req.user.userId, dto);
   }
 
   @Post(':id/confirm')
@@ -71,7 +64,10 @@ export class ExpensesController {
   }
 
   @Post('bulk-confirm')
-  async bulkConfirm(@Body('ids') ids: string[], @Req() req) {
-    return this.expensesService.bulkConfirm(ids, req.user.userId);
+  async bulkConfirm(@Body() dto: BulkConfirmDto, @Req() req) {
+    if (dto.ids.length > 100) {
+      dto.ids = dto.ids.slice(0, 100);
+    }
+    return this.expensesService.bulkConfirm(dto.ids, req.user.userId);
   }
 }

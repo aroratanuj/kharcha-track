@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -13,15 +13,15 @@ export class AuthService {
   ) {}
 
   async register(email: string, password: string, fullName: string) {
-    const existingUser = await this.userModel.findOne({ email });
+    const existingUser = await this.userModel.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      throw new UnauthorizedException('User already exists');
+      throw new ConflictException('Registration failed. Please try a different email.');
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await this.userModel.create({
-      email,
+      email: email.toLowerCase(),
       passwordHash,
       fullName,
       role: 'user',
@@ -41,7 +41,7 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    const user = await this.userModel.findOne({ email });
+    const user = await this.userModel.findOne({ email: email.toLowerCase() });
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -67,8 +67,7 @@ export class AuthService {
   }
 
   async getUserById(userId: string) {
-    const user = await this.userModel.findById(userId);
-
+    const user = await this.userModel.findById(userId).select('-passwordHash').lean();
     if (!user) {
       throw new UnauthorizedException('User not found');
     }

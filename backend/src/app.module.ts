@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import * as path from 'path';
 import { AuthModule } from './auth/auth.module';
 import { ExpensesModule } from './expenses/expenses.module';
@@ -18,8 +20,16 @@ import { AccountSourceModule } from './account-source/account-source.module';
         path.resolve(process.cwd(), '.env'),
         path.resolve(process.cwd(), '../.env'),
       ],
+      validationSchema: {
+        isGlobal: true,
+      },
     }),
     MongooseModule.forRoot(process.env.MONGODB_URI || process.env.DATABASE_URL),
+    ThrottlerModule.forRoot([
+      { name: 'short', ttl: 1000, limit: 3 },
+      { name: 'medium', ttl: 10000, limit: 20 },
+      { name: 'webhook', ttl: 60000, limit: 10 },
+    ]),
     AuthModule,
     ExpensesModule,
     CategoriesModule,
@@ -27,6 +37,9 @@ import { AccountSourceModule } from './account-source/account-source.module';
     AnalyticsModule,
     EmailModule,
     AccountSourceModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}
