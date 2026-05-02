@@ -25,9 +25,9 @@ import { AccountSourceModule } from './account-source/account-source.module';
     MongooseModule.forRoot(process.env.MONGODB_URI || process.env.DATABASE_URL),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
-      { name: 'short', ttl: 1000, limit: 30 },
-      { name: 'medium', ttl: 10000, limit: 200 },
-      { name: 'webhook', ttl: 60000, limit: 10 },
+      { name: 'short', ttl: 1000, limit: 100 },
+      { name: 'medium', ttl: 10000, limit: 500 },
+      { name: 'webhook', ttl: 60000, limit: 20 },
     ]),
     AuthModule,
     ExpensesModule,

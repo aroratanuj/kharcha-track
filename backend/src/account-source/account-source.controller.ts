@@ -4,16 +4,17 @@ import { JwtAuthGuard } from '../auth/jwt.guard';
 import { AdminGuard } from '../auth/admin.guard';
 
 @Controller('account-sources')
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(JwtAuthGuard)
 export class AccountSourceController {
   constructor(private service: AccountSourceService) {}
 
   @Get()
   async findAll() {
-    return this.service.findAll();
+    return this.service.findActive();
   }
 
   @Post()
+  @UseGuards(AdminGuard)
   async create(
     @Body('label') label: string,
     @Body('icon') icon: string,
@@ -22,6 +23,7 @@ export class AccountSourceController {
   }
 
   @Put(':id')
+  @UseGuards(AdminGuard)
   async update(
     @Param('id') id: string,
     @Body('label') label?: string,
@@ -32,6 +34,7 @@ export class AccountSourceController {
   }
 
   @Delete(':id')
+  @UseGuards(AdminGuard)
   async delete(@Param('id') id: string) {
     return this.service.delete(id);
   }
