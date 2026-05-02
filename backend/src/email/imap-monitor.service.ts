@@ -35,13 +35,10 @@ export class ImapMonitorService {
       const client = new ImapFlow({
         host,
         port: parseInt(process.env.IMAP_PORT || '993', 10),
-        user,
-        pass,
+        auth: { user, pass },
         secure: true,
-        authTimeout: 30000,
-        socketTimeout: 60000,
         logger: false,
-      } as any);
+      });
 
       client.on('error', (err: any) => {
         this.logger.error(`IMAP connection error: ${err.message}`);
