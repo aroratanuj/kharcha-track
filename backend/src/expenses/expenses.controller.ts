@@ -32,10 +32,26 @@ export class ExpensesController {
     return this.expensesService.findAll(req.user.userId, status);
   }
 
+  @Get('drafts')
+  async findDrafts(@Req() req: any): Promise<any> {
+    return this.expensesService.findAll(req.user.userId, 'draft');
+  }
+
+  @Get('summary')
+  async getSummary(@Req() req: any, @Query('month') month?: string, @Query('year') year?: string): Promise<any> {
+    return this.expensesService.getMonthlySummary(req.user.userId, month, year);
+  }
+
   @Get('all')
   @UseGuards(AdminGuard)
   async findAllAdmin(@Query('userId') userId?: string, @Query('status') status?: string): Promise<any> {
     return this.expensesService.findAllAdmin(userId, status);
+  }
+
+  @Get('unassigned')
+  @UseGuards(AdminGuard)
+  async findUnassigned(): Promise<any> {
+    return this.expensesService.findUnassigned();
   }
 
   @Get(':id')
@@ -54,13 +70,19 @@ export class ExpensesController {
 
   @Post(':id/confirm')
   async confirm(@Param('id') id: string, @Req() req: any): Promise<any> {
-    return this.expensesService.confirm(id, req.user.userId);
+    const isAdmin = req.user.role === 'admin';
+    return this.expensesService.confirm(id, req.user.userId, isAdmin);
+  }
+
+  @Post(':id/assign')
+  @UseGuards(AdminGuard)
+  async assign(@Param('id') id: string, @Body() body: { userId: string }): Promise<any> {
+    return this.expensesService.assignToUser(id, body.userId);
   }
 
   @Delete(':id')
-  @UseGuards(AdminGuard)
-  async delete(@Param('id') id: string) {
-    return this.expensesService.delete(id);
+  async delete(@Param('id') id: string, @Req() req: any): Promise<any> {
+    return this.expensesService.delete(id, req.user.userId);
   }
 
   @Post('bulk-confirm')

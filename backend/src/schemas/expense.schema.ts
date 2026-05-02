@@ -17,13 +17,13 @@ export class Expense {
   @Prop({ required: true })
   date: Date;
 
-  @Prop({ enum: ['draft', 'confirmed'], default: 'confirmed' })
+  @Prop({ enum: ['draft', 'confirmed', 'unassigned'], default: 'confirmed' })
   status: string;
 
   @Prop({ type: Types.ObjectId, ref: 'Category' })
   categoryId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: Types.ObjectId, ref: 'User' })
   userId: Types.ObjectId;
 
   @Prop({ enum: ['UPI', 'Card', 'Bank Account', 'Cash'] })

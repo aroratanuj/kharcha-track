@@ -1,26 +1,28 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Alert, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/Toast';
-import { useResponsive } from '../../hooks/useResponsive';
+import FabButton from '../../components/FabButton';
 import api from '../../services/api';
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
-interface Expense {
+interface DraftExpense {
   id: string;
   amount: number;
   description: string;
-  date: string;
   merchantName: string;
+  date: string;
   category: { id: string; name: string; color: string; icon: string } | null;
   accountSource: string;
-  status: 'draft' | 'confirmed';
+  status: string;
+  user?: { id: string; name: string; email: string } | null;
+  metadata?: {
+    source?: string;
+    confidence?: string;
+    senderEmail?: string;
+    subject?: string;
+  };
 }
 
 export default function DraftExpensesScreen() {
@@ -28,129 +30,180 @@ export default function DraftExpensesScreen() {
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
   const toast = useToast();
-  const { isWeb } = useResponsive();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+  const isAdmin = user?.role === 'admin';
+  const [drafts, setDrafts] = useState<DraftExpense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-
-  useEffect(() => { loadExpenses(); }, []);
-
-  async function loadExpenses() {
+  const loadDrafts = useCallback(async () => {
+    setLoading(true);
     try {
-      const response = await api.get('/expenses');
-      setAllExpenses(response.data);
-    } catch (error: any) {
-      if (error.message?.includes('Network')) toast.error('Cannot connect to server');
-      else toast.error('Failed to load expenses');
-    } finally { setLoading(false); }
+      let res;
+      if (isAdmin) {
+        res = await api.get('/expenses/all', { params: { status: 'draft' } });
+      } else {
+        res = await api.get('/expenses/drafts');
+      }
+      setDrafts(res.data);
+    } catch {
+      toast.error('Failed to load drafts');
+    } finally {
+      setLoading(false);
+    }
+  }, [toast, isAdmin]);
+
+  useEffect(() => { loadDrafts(); }, [loadDrafts]);
+
+  async function handleConfirm(id: string) {
+    try {
+      await api.post(`/expenses/${id}/confirm`);
+      toast.success('Expense confirmed');
+      await loadDrafts();
+    } catch {
+      toast.error('Failed to confirm');
+    }
   }
 
-  useEffect(() => {
-    const filtered = allExpenses.filter(e => {
-      const d = new Date(e.date);
-      return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+  async function handleDelete(id: string) {
+    Alert.alert('Delete Draft', 'Remove this draft expense?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await api.delete(`/expenses/${id}`); toast.success('Draft deleted'); await loadDrafts(); }
+        catch { toast.error('Failed to delete'); }
+      }},
+    ]);
+  }
+
+  function handleEdit(item: DraftExpense) {
+    navigation.navigate('ExpenseForm', { expense: item });
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
-    filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setExpenses(filtered);
-  }, [allExpenses, selectedMonth, selectedYear]);
-
-  function handlePrevMonth() {
-    if (selectedMonth === 1) { setSelectedMonth(12); setSelectedYear(y => y - 1); }
-    else setSelectedMonth(m => m - 1);
-  }
-  function handleNextMonth() {
-    if (selectedMonth === 12) { setSelectedMonth(1); setSelectedYear(y => y + 1); }
-    else setSelectedMonth(m => m + 1);
   }
 
-  const isCurrentMonth = selectedMonth === now.getMonth() + 1 && selectedYear === now.getFullYear();
-  const totalAmount = useMemo(() => expenses.reduce((sum, e) => sum + Number(e.amount), 0), [expenses]);
+  function toggleSelectAll() {
+    if (selectedIds.size === drafts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(drafts.map(d => d.id)));
+    }
+  }
 
-  async function handleConfirmExpense(id: string) {
-    try { await api.post(`/expenses/${id}/confirm`); toast.success('Expense confirmed'); await loadExpenses(); }
-    catch (e: any) { toast.error(e.response?.data?.message || 'Failed to confirm'); }
+  async function handleBulkConfirm() {
+    if (selectedIds.size === 0) return;
+    Alert.alert('Confirm Selected', `Confirm ${selectedIds.size} draft expense${selectedIds.size !== 1 ? 's' : ''}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Confirm', onPress: async () => {
+        try {
+          await api.post('/expenses/bulk-confirm', { ids: Array.from(selectedIds) });
+          toast.success(`${selectedIds.size} expense(s) confirmed`);
+          setSelectedIds(new Set());
+          await loadDrafts();
+        } catch { toast.error('Failed to confirm'); }
+      }},
+    ]);
+  }
+
+  function renderItem({ item }: { item: DraftExpense }) {
+    const isSelected = selectedIds.has(item.id);
+    const d = new Date(item.date);
+    const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const isEmail = item.metadata?.source === 'email';
+    const confidence = item.metadata?.confidence || 'medium';
+    const confColor = confidence === 'high' ? '#34C759' : confidence === 'medium' ? '#FF9500' : '#FF3B30';
+
+    return (
+      <View style={[s.card, { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : colors.border }]}>
+        <TouchableOpacity style={s.cardMain} onPress={() => toggleSelect(item.id)} activeOpacity={0.7}>
+          <View style={s.cardCheck}>
+            <View style={[s.checkbox, { borderColor: colors.border, backgroundColor: isSelected ? colors.primary : 'transparent' }]} />
+          </View>
+          <View style={s.cardBody}>
+            <View style={s.cardTop}>
+              <Text style={[s.cardDesc, { color: colors.text }]} numberOfLines={1}>{item.description}</Text>
+              {isEmail && (
+                <View style={[s.badge, { backgroundColor: isDark ? '#1a2a4a' : '#E8F4FF' }]}>
+                  <Text style={[s.badgeText, { color: colors.primary }]}>Email</Text>
+                </View>
+              )}
+              <View style={[s.badge, { backgroundColor: isDark ? '#2a2a1a' : '#FFF8E1' }]}>
+                <Text style={[s.badgeText, { color: confColor }]}>{confidence}</Text>
+              </View>
+            </View>
+            <View style={s.cardMeta}>
+              <Text style={[s.cardAmount, { color: colors.primary }]}>₹{Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+              <Text style={[s.cardDate, { color: colors.textMuted }]}>{dateStr}</Text>
+            </View>
+            {item.merchantName ? <Text style={[s.cardMerchant, { color: colors.textMuted }]}>{item.merchantName}</Text> : null}
+            {isAdmin && item.user && (
+              <Text style={[s.cardOwner, { color: colors.textMuted }]}>👤 {item.user.name}</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+        <View style={[s.cardActions, { borderTopColor: colors.border }]}>
+          <TouchableOpacity style={[s.actionBtn, { backgroundColor: isDark ? '#1a3a2a' : '#E8F8EF' }]} onPress={() => handleConfirm(item.id)}>
+            <Text style={[s.actionBtnText, { color: '#34C759' }]}>Confirm</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.actionBtn, { backgroundColor: isDark ? '#1a2a4a' : '#E8F4FF' }]} onPress={() => handleEdit(item)}>
+            <Text style={[s.actionBtnText, { color: colors.primary }]}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.actionBtn, { backgroundColor: isDark ? '#3a2020' : '#FFF0F0' }]} onPress={() => handleDelete(item.id)}>
+            <Text style={[s.actionBtnText, { color: '#FF3B30' }]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   }
 
   return (
     <View style={[s.outer, { backgroundColor: colors.bg }]}>
       <View style={[s.screenBorder, { backgroundColor: colors.surface, borderColor: colors.screenBorder }]}>
-        <View style={[s.filterBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <TouchableOpacity style={[s.filterArrow, { backgroundColor: colors.card }]} onPress={handlePrevMonth}>
-            <Text style={[s.filterArrowText, { color: colors.text }]}>&#8249;</Text>
-          </TouchableOpacity>
-          <View style={s.filterCenter}>
-            <Text style={[s.filterLabel, { color: colors.text }]}>{MONTHS[selectedMonth - 1]} {selectedYear}</Text>
-            <Text style={[s.filterCount, { color: colors.textMuted }]}>{expenses.length} expense{expenses.length !== 1 ? 's' : ''}</Text>
+        {isAdmin && (
+          <View style={[s.adminBar, { backgroundColor: isDark ? '#1a1a2a' : '#F0F4FF', borderBottomColor: colors.border }]}>
+            <Text style={[s.adminBarText, { color: colors.primary }]}>Admin: Viewing all users' drafts</Text>
           </View>
-          <TouchableOpacity style={[s.filterArrow, isCurrentMonth && s.disabled, { backgroundColor: colors.card }]} onPress={handleNextMonth} disabled={isCurrentMonth}>
-            <Text style={[s.filterArrowText, isCurrentMonth && { color: colors.border }, { color: colors.text }]}>&#8250;</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={[s.summary, { backgroundColor: colors.primary }]}>
-          <Text style={s.summaryLabel}>Total Spent</Text>
-          <Text style={s.summaryAmount}>₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-        </View>
+        )}
+        {drafts.length > 0 && (
+          <View style={[s.bulkBar, { backgroundColor: isDark ? '#1a1a2a' : '#F0F4FF', borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={toggleSelectAll} style={s.selectAllBtn}>
+              <Text style={[s.selectAllText, { color: colors.primary }]}>
+                {selectedIds.size === drafts.length ? 'Deselect All' : 'Select All'}
+              </Text>
+            </TouchableOpacity>
+            {selectedIds.size > 0 && (
+              <TouchableOpacity style={[s.bulkConfirmBtn, { backgroundColor: colors.primary }]} onPress={handleBulkConfirm}>
+                <Text style={s.bulkConfirmText}>Confirm ({selectedIds.size})</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         <FlatList
-          data={expenses}
+          data={drafts}
           keyExtractor={(item) => item.id}
           refreshing={loading}
           contentContainerStyle={{ paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={loadExpenses} tintColor={colors.primary} colors={[colors.primary]} />}
-          renderItem={({ item }) => {
-            const d = new Date(item.date);
-            const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-            const accIcon = item.accountSource === 'UPI' ? '📱' : item.accountSource === 'Card' ? '💳' : item.accountSource === 'Cash' ? '💵' : '🏦';
-            return (
-              <TouchableOpacity style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('ExpenseForm', { expense: item })}>
-                <View style={s.cardHeader}>
-                  <View style={s.cardCat}>
-                    <Text style={s.cardCatIcon}>{item.category?.icon || '📦'}</Text>
-                    <Text style={[s.cardCatName, { color: colors.textSecondary }]}>{item.category?.name || 'Uncategorized'}</Text>
-                  </View>
-                  <View style={[s.badge, { backgroundColor: item.status === 'confirmed' ? (isDark ? '#1a3a2a' : '#E8F8EF') : (isDark ? '#3a3520' : '#FFF8E1') }]}>
-                    <Text style={[s.badgeText, { color: item.status === 'confirmed' ? colors.success : colors.warning }]}>{item.status === 'confirmed' ? 'Confirmed' : 'Draft'}</Text>
-                  </View>
-                </View>
-                <Text style={[s.cardDesc, { color: colors.text }]}>{item.description}</Text>
-                <View style={s.cardFooter}>
-                  <Text style={[s.cardAmount, { color: colors.primary }]}>₹{Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-                  <View style={s.cardRight}>
-                    {item.merchantName ? <Text style={[s.cardMerchant, { color: colors.textMuted }]}>{item.merchantName}</Text> : null}
-                    <Text style={[s.cardDate, { color: colors.textMuted }]}>{dateStr}</Text>
-                  </View>
-                </View>
-                {item.accountSource ? (
-                  <View style={[s.cardMeta, { borderTopColor: colors.border }]}>
-                    <Text style={[s.cardMetaText, { color: colors.textMuted }]}>{accIcon} {item.accountSource}</Text>
-                  </View>
-                ) : null}
-                {item.status === 'draft' && (
-                  <TouchableOpacity style={[s.confirmBtn, { backgroundColor: colors.success }]} onPress={(e) => { e.stopPropagation(); handleConfirmExpense(item.id); }}>
-                    <Text style={s.confirmBtnText}>Confirm</Text>
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            );
-          }}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={loadDrafts} tintColor={colors.primary} colors={[colors.primary]} />}
+          renderItem={renderItem}
           ListEmptyComponent={
-            <View style={s.empty}>
-              <Text style={s.emptyIcon}>📊</Text>
-              <Text style={[s.emptyTitle, { color: colors.text }]}>No expenses this month</Text>
-              <Text style={[s.emptySub, { color: colors.textMuted }]}>{isCurrentMonth ? 'Tap + to add your first expense' : 'No expenses for this period'}</Text>
-            </View>
+            !loading ? (
+              <View style={s.empty}>
+                <Text style={s.emptyIcon}>📥</Text>
+                <Text style={[s.emptyTitle, { color: colors.text }]}>No Pending Drafts</Text>
+                <Text style={[s.emptySub, { color: colors.textMuted }]}>Forward expense emails to your Kharcha inbox.</Text>
+                <Text style={[s.emptySub, { color: colors.textMuted }]}>AI will create draft expenses automatically.</Text>
+              </View>
+            ) : null
           }
         />
-
-        <TouchableOpacity style={[s.fab, { backgroundColor: colors.primary, shadowColor: colors.primary }]} onPress={() => navigation.navigate('ExpenseForm')}>
-          <Text style={s.fabText}>+</Text>
-        </TouchableOpacity>
       </View>
+      <FabButton />
     </View>
   );
 }
@@ -158,37 +211,32 @@ export default function DraftExpensesScreen() {
 const s = StyleSheet.create({
   outer: { flex: 1, alignItems: 'center', paddingTop: 4 },
   screenBorder: { flex: 1, width: '100%', maxWidth: 700, borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
-  filterBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1 },
-  filterArrow: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  disabled: { opacity: 0.3 },
-  filterArrowText: { fontSize: 22, fontWeight: '600', marginTop: -2 },
-  filterCenter: { alignItems: 'center' },
-  filterLabel: { fontSize: 18, fontWeight: '700' },
-  filterCount: { fontSize: 12, marginTop: 2 },
-  summary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  summaryLabel: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
-  summaryAmount: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
-  card: { marginHorizontal: 12, marginVertical: 6, padding: 14, borderRadius: 12, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  cardCat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cardCatIcon: { fontSize: 16 },
-  cardCatName: { fontSize: 13, fontWeight: '600' },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  adminBar: { paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1 },
+  adminBarText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  bulkBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1 },
+  selectAllBtn: { paddingHorizontal: 8, paddingVertical: 6 },
+  selectAllText: { fontSize: 14, fontWeight: '600' },
+  bulkConfirmBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, minHeight: 36, justifyContent: 'center' },
+  bulkConfirmText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  card: { marginHorizontal: 12, marginVertical: 6, borderRadius: 12, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  cardMain: { flexDirection: 'row', padding: 12 },
+  cardCheck: { justifyContent: 'center', paddingRight: 10 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2 },
+  cardBody: { flex: 1 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
+  cardDesc: { fontSize: 15, fontWeight: '600', flex: 1 },
+  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   badgeText: { fontSize: 11, fontWeight: '600' },
-  cardDesc: { fontSize: 15, fontWeight: '500', marginBottom: 6 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  cardAmount: { fontSize: 18, fontWeight: 'bold' },
-  cardRight: { alignItems: 'flex-end', gap: 2 },
-  cardMerchant: { fontSize: 12 },
-  cardDate: { fontSize: 11 },
-  cardMeta: { marginTop: 8, paddingTop: 8, borderTopWidth: 1 },
-  cardMetaText: { fontSize: 12 },
-  confirmBtn: { marginTop: 10, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignItems: 'center', minHeight: 44, justifyContent: 'center' },
-  confirmBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 50 },
+  cardMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardAmount: { fontSize: 17, fontWeight: 'bold' },
+  cardDate: { fontSize: 12 },
+  cardMerchant: { fontSize: 12, color: '#888', marginTop: 2 },
+  cardOwner: { fontSize: 12, marginTop: 4, fontStyle: 'italic' },
+  cardActions: { flexDirection: 'row', borderTopWidth: 1, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 10, gap: 8 },
+  actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, minHeight: 32, justifyContent: 'center' },
+  actionBtnText: { fontSize: 13, fontWeight: '600' },
+  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 6 },
-  emptySub: { fontSize: 14, textAlign: 'center' },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 8 },
-  fabText: { fontSize: 28, color: '#fff', fontWeight: 'bold' },
+  emptySub: { fontSize: 14, textAlign: 'center', color: '#888', marginBottom: 4 },
 });

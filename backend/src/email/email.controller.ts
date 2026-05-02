@@ -1,13 +1,17 @@
 import crypto from 'crypto';
-import { Controller, Post, Req, Res, Body, RawBodyRequest, HttpException, Logger } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Controller, Post, Req, Body, HttpException, Logger } from '@nestjs/common';
+import { Request } from 'express';
 import { EmailService } from './email.service';
+import { EmailSenderService } from './email-sender.service';
 
 @Controller('email')
 export class EmailController {
   private readonly logger = new Logger(EmailController.name);
 
-  constructor(private emailService: EmailService) {}
+  constructor(
+    private emailService: EmailService,
+    private emailSenderService: EmailSenderService,
+  ) {}
 
   @Post('webhook')
   async handleMailgunWebhook(
@@ -19,34 +23,38 @@ export class EmailController {
 
       const emailContent = body['body-plain'] || body['body-html'] || '';
       const subject = body.subject || '';
+      const sender = body.sender || body.From || '';
 
-      const recipient = body.recipient || body.to || '';
-      let userId = null;
-
-      const plusMatch = recipient.match(/^expense\+(.+)@/i);
-      if (plusMatch) {
-        userId = plusMatch[1];
+      if (!sender) {
+        return { success: false, message: 'No sender found in email' };
       }
 
-      if (!userId) {
-        const subMatch = subject.match(/expense\+(.+)@/i);
-        if (subMatch) {
-          userId = subMatch[1];
-        }
-      }
-
-      if (!userId) {
-        return { success: false, message: 'No user ID found in recipient address' };
-      }
-
-      const digest = hashContent((subject + '|' + emailContent).substring(0, 5000));
+      const digest = this.hashContent((subject + '|' + emailContent).substring(0, 5000));
       const existing = await this.emailService.findByDigest(digest);
       if (existing) {
         return { success: false, message: 'Duplicate email already processed', expenseId: existing };
       }
 
-      const result = await this.emailService.processEmail(emailContent, userId, subject, digest);
-      return result;
+      const parsedExpense = await this.emailService.parseExpenseWithAI(emailContent);
+
+      const userId = await this.emailService.findUserByEmail(sender);
+
+      if (userId) {
+        const result = await this.emailService.processEmail(emailContent, userId, subject, digest, parsedExpense);
+        return { ...result, recognized: true };
+      }
+
+      const unassignedCount = await this.emailService.countUnassignedBySender(sender);
+      if (unassignedCount >= 10) {
+        return { success: false, message: 'Max unassigned drafts reached for this sender' };
+      }
+
+      const result = await this.emailService.processUnassignedEmail(emailContent, sender, subject, digest, parsedExpense);
+
+      this.emailSenderService.sendWelcome(sender, sender, parsedExpense).catch(() => {});
+      this.emailSenderService.sendAdminNotification(sender, parsedExpense).catch(() => {});
+
+      return { ...result, recognized: false, welcomeSent: true };
     } catch (error) {
       this.logger.error('Webhook processing failed: ' + error.message);
       return { success: false, error: 'Internal processing error' };
@@ -73,8 +81,8 @@ export class EmailController {
       throw new HttpException('Invalid webhook signature', 401);
     }
   }
-}
 
-function hashContent(str: string): string {
-  return crypto.createHash('sha256').update(str).digest('hex');
+  private hashContent(str: string): string {
+    return crypto.createHash('sha256').update(str).digest('hex');
+  }
 }

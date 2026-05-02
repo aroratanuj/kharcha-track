@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, ActivityIndicator, Modal, FlatList } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -50,14 +50,25 @@ export default function ExpenseFormScreen() {
   const [categoryLoadError, setCategoryLoadError] = useState(false);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
 
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
   const [date, setDate] = useState(todayStr);
 
   const isFormValid = useMemo(() => {
-    return amount && parseFloat(amount) > 0 && description.trim() && categoryId && date && accountSource;
-  }, [amount, description, categoryId, date, accountSource]);
+    const userOk = !isAdmin || selectedUserId;
+    return amount && parseFloat(amount) > 0 && description.trim() && categoryId && date && accountSource && userOk;
+  }, [amount, description, categoryId, date, accountSource, isAdmin, selectedUserId]);
+
+  const selectedUser = useMemo(() => users.find(u => u.id === selectedUserId), [users, selectedUserId]);
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearch.trim()) return users;
+    const q = userSearch.toLowerCase();
+    return users.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+  }, [users, userSearch]);
 
   useEffect(() => {
     (async () => {
@@ -107,6 +118,7 @@ export default function ExpenseFormScreen() {
     if (!categoryId) e.category = 'Select a category';
     if (!date) e.date = 'Date is required';
     if (!accountSource) e.accountSource = 'Select an account';
+    if (isAdmin && !selectedUserId) e.user = 'Select a user';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -156,25 +168,23 @@ export default function ExpenseFormScreen() {
     <View style={[s.outer, { backgroundColor: colors.bg }]}>
       <View style={[s.screenBorder, { backgroundColor: colors.surface, borderColor: colors.screenBorder }]}>
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator indicatorStyle="black">
-          <View style={[s.form, { maxWidth: isWeb ? 600 : undefined, paddingHorizontal: 16 }]}>
+          <View style={[s.form, { maxWidth: isWeb ? 600 : undefined, paddingHorizontal: 16, alignSelf: 'center' }]}>
             <Text style={[s.title, { color: colors.text }]}>{editingExpense ? 'Edit Expense' : 'New Expense'}</Text>
 
             {isAdmin && (
               <View style={s.field}>
                 <Text style={[s.label, { color: colors.text }]}>Create For (User) *</Text>
-                {users.length === 0 ? <Text style={[s.empty, { color: colors.textMuted }]}>No users found</Text> : (
-                  <View style={s.userList}>
-                    {users.map(u => {
-                      const sel = selectedUserId === u.id;
-                      return (
-                        <TouchableOpacity key={u.id} style={[s.userItem, { borderColor: sel ? colors.primary : colors.border, backgroundColor: sel ? (isDark ? '#1a2a4a' : '#E8F4FF') : colors.inputBg }]} onPress={() => setSelectedUserId(u.id)}>
-                          <Text style={[s.userName, { color: colors.text }]}>{u.name}</Text>
-                          <Text style={[s.userEmail, { color: colors.textMuted }]}>{u.email}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
+                <TouchableOpacity
+                  style={[s.input, s.dropdownTrigger, { backgroundColor: colors.inputBg, borderColor: selectedUserId ? colors.primary : colors.inputBorder }]}
+                  onPress={() => setDropdownVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.dropdownText, { color: selectedUserId ? colors.text : colors.textMuted }]}>
+                    {selectedUser ? `${selectedUser.name} (${selectedUser.email})` : 'Select a user'}
+                  </Text>
+                  <Text style={s.dropdownArrow}>▾</Text>
+                </TouchableOpacity>
+                {errors.user && <Text style={s.err}>{errors.user}</Text>}
               </View>
             )}
 
@@ -242,13 +252,61 @@ export default function ExpenseFormScreen() {
           </View>
         </ScrollView>
       </View>
+
+      <Modal visible={dropdownVisible} transparent animationType="fade" onRequestClose={() => setDropdownVisible(false)}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setDropdownVisible(false)}>
+          <View style={[s.modal, { backgroundColor: colors.surface, shadowColor: colors.shadowColor }]}>
+            <Text style={[s.modalTitle, { color: colors.text }]}>Select User</Text>
+            <View style={[s.searchWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+              <Text style={s.searchIcon}>🔍</Text>
+              <TextInput
+                style={[s.searchInput, { color: colors.text }]}
+                placeholder="Search by name or email..."
+                placeholderTextColor={colors.textMuted}
+                value={userSearch}
+                onChangeText={setUserSearch}
+                autoFocus
+              />
+            </View>
+            <FlatList
+              data={filteredUsers}
+              keyExtractor={(item) => item.id}
+              style={s.userList}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => {
+                const sel = selectedUserId === item.id;
+                return (
+                  <TouchableOpacity
+                    style={[s.userItem, { backgroundColor: sel ? (isDark ? '#1a2a4a' : '#E8F4FF') : colors.card }]}
+                    onPress={() => { setSelectedUserId(item.id); setDropdownVisible(false); setUserSearch(''); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.userName, { color: sel ? colors.primary : colors.text }]}>{item.name}</Text>
+                    <Text style={[s.userEmail, { color: colors.textMuted }]}>{item.email}</Text>
+                    {item.role === 'admin' && (
+                      <View style={[s.adminBadge, { backgroundColor: isDark ? '#3a2a1a' : '#FFF3E0' }]}>
+                        <Text style={s.adminBadgeText}>Admin</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={s.emptyList}>
+                  <Text style={[s.emptyListText, { color: colors.textMuted }]}>No users found</Text>
+                </View>
+              }
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
 
 const s = StyleSheet.create({
   outer: { flex: 1, alignItems: 'center', paddingTop: 4 },
-  screenBorder: { flex: 1, width: '100%', borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
+  screenBorder: { flex: 1, width: '100%', maxWidth: 700, borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 40 },
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -264,10 +322,9 @@ const s = StyleSheet.create({
   errBoxText: { fontSize: 13, flex: 1, color: '#FF3B30' },
   errBoxBtn: { backgroundColor: '#FF3B30', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   errBoxBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  userList: { gap: 8 },
-  userItem: { padding: 12, borderRadius: 10, borderWidth: 1 },
-  userName: { fontSize: 15, fontWeight: '600' },
-  userEmail: { fontSize: 12, marginTop: 2 },
+  dropdownTrigger: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  dropdownText: { fontSize: 16, flex: 1 },
+  dropdownArrow: { fontSize: 16, color: '#999' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   gridItem: { borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 2, width: '22%', minHeight: 60, justifyContent: 'center' },
   gridIcon: { fontSize: 20, marginBottom: 2 },
@@ -277,4 +334,18 @@ const s = StyleSheet.create({
   btnRow: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 32 },
   cancelBtn: { borderRadius: 10, padding: 16, alignItems: 'center', flex: 1, borderWidth: 1, minHeight: 48, justifyContent: 'center' },
   cancelBtnText: { fontSize: 16, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modal: { width: '85%', maxWidth: 400, maxHeight: '70%', borderRadius: 16, padding: 20, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 },
+  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 14, textAlign: 'center' },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, height: 44, marginBottom: 12 },
+  searchIcon: { fontSize: 16, marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 15, height: '100%' },
+  userList: { maxHeight: 300 },
+  userItem: { padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#e0e0e0', marginBottom: 4, minHeight: 44, justifyContent: 'center' },
+  userName: { fontSize: 15, fontWeight: '600' },
+  userEmail: { fontSize: 12, marginTop: 2 },
+  adminBadge: { position: 'absolute', right: 12, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+  adminBadgeText: { fontSize: 10, fontWeight: '700', color: '#E65100' },
+  emptyList: { padding: 24, alignItems: 'center' },
+  emptyListText: { fontSize: 14 },
 });

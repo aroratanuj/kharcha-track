@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import api from '../services/api';
 
 const Drawer = createDrawerNavigator();
 
 import HomeScreen from '../screens/HomeScreen';
 import ExpenseFormScreen from '../screens/expenses/ExpenseFormScreen';
+import DraftExpensesScreen from '../screens/expenses/DraftExpensesScreen';
 import BudgetDashboardScreen from '../screens/budget/BudgetDashboardScreen';
 import AnalyticsDashboardScreen from '../screens/analytics/AnalyticsDashboardScreen';
 import ConfigScreen from '../screens/ConfigScreen';
@@ -16,6 +18,18 @@ function CustomDrawerContent(props: any) {
   const { user, signOut } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
   const isAdmin = user?.role === 'admin';
+  const [draftCount, setDraftCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) { setDraftCount(0); return; }
+    (async () => {
+      try {
+        const res = await api.get('/expenses/summary');
+        if (res.data?.draftCount) setDraftCount(res.data.draftCount);
+        else setDraftCount(0);
+      } catch { /* silent */ }
+    })();
+  }, [user]);
 
   return (
     <View style={[styles.drawer, { backgroundColor: colors.drawerBg }]}>
@@ -34,6 +48,14 @@ function CustomDrawerContent(props: any) {
 
       <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
         <DrawerItemList {...props} />
+
+        {draftCount > 0 && (
+          <View style={styles.draftBadgeWrap}>
+            <View style={[styles.draftBadge, { backgroundColor: '#FF3B30' }]}>
+              <Text style={styles.draftBadgeText}>{draftCount}</Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.menuSeparator}>
           <View style={[styles.separatorLine, { backgroundColor: colors.border }]} />
@@ -73,6 +95,8 @@ export default function AppDrawerNavigator() {
         headerShadowVisible: false,
         sceneContainerStyle: { backgroundColor: colors.bg },
         drawerItemStyle: { marginVertical: 2, marginHorizontal: 8, borderRadius: 8 },
+        headerTitleContainerStyle: { maxWidth: 700, alignSelf: 'center' },
+        headerLeftContainerStyle: { maxWidth: 700, position: 'absolute', left: 0 },
       }}
     >
       <Drawer.Screen
@@ -81,31 +105,42 @@ export default function AppDrawerNavigator() {
         options={{ drawerLabel: '🏠  Home', title: 'Kharcha-Track' }}
       />
       <Drawer.Screen
+        name="DraftExpenses"
+        component={DraftExpensesScreen}
+        options={{ drawerLabel: '📥  Drafts', title: 'Draft Expenses' }}
+      />
+      <Drawer.Screen
         name="ExpenseForm"
         component={ExpenseFormScreen}
         options={{ drawerItemStyle: { display: 'none' }, title: 'Expense' }}
       />
-      {isAdmin && (
-        <Drawer.Screen
-          name="BudgetDashboard"
-          component={BudgetDashboardScreen}
-          options={{ drawerLabel: '💰  Budgets', title: 'Budgets' }}
-        />
-      )}
-      {isAdmin && (
-        <Drawer.Screen
-          name="Analytics"
-          component={AnalyticsDashboardScreen}
-          options={{ drawerLabel: '📊  Analytics', title: 'Analytics' }}
-        />
-      )}
-      {isAdmin && (
-        <Drawer.Screen
-          name="Configuration"
-          component={ConfigScreen}
-          options={{ drawerLabel: '⚙️  Configuration', title: 'Configuration' }}
-        />
-      )}
+      <Drawer.Screen
+        name="BudgetDashboard"
+        component={BudgetDashboardScreen}
+        options={{
+          drawerLabel: '💰  Budgets',
+          drawerItemStyle: isAdmin ? undefined : { display: 'none', height: 0 },
+          title: 'Budgets',
+        }}
+      />
+      <Drawer.Screen
+        name="Analytics"
+        component={AnalyticsDashboardScreen}
+        options={{
+          drawerLabel: '📊  Analytics',
+          drawerItemStyle: isAdmin ? undefined : { display: 'none', height: 0 },
+          title: 'Analytics',
+        }}
+      />
+      <Drawer.Screen
+        name="Configuration"
+        component={ConfigScreen}
+        options={{
+          drawerLabel: '⚙️  Configuration',
+          drawerItemStyle: isAdmin ? undefined : { display: 'none', height: 0 },
+          title: 'Configuration',
+        }}
+      />
     </Drawer.Navigator>
   );
 }
@@ -152,6 +187,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
     letterSpacing: 1,
+  },
+  draftBadgeWrap: {
+    position: 'absolute',
+    top: 4,
+    right: 16,
+  },
+  draftBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  draftBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   menuSeparator: {
     paddingVertical: 8,

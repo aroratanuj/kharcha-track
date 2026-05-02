@@ -23,8 +23,8 @@ import { AccountSourceModule } from './account-source/account-source.module';
     }),
     MongooseModule.forRoot(process.env.MONGODB_URI || process.env.DATABASE_URL),
     ThrottlerModule.forRoot([
-      { name: 'short', ttl: 1000, limit: 3 },
-      { name: 'medium', ttl: 10000, limit: 20 },
+      { name: 'short', ttl: 1000, limit: 30 },
+      { name: 'medium', ttl: 10000, limit: 200 },
       { name: 'webhook', ttl: 60000, limit: 10 },
     ]),
     AuthModule,
