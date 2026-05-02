@@ -7,7 +7,7 @@ import { useToast } from '../../components/Toast';
 import { useResponsive } from '../../hooks/useResponsive';
 import DatePicker from '../../components/DatePicker';
 import api from '../../services/api';
-import { AccountSource } from '../../types/expense';
+import { AccountSourceOption } from '../../types/expense';
 
 if (Platform.OS === 'web') {
   const styleId = 'kharcha-global-style';
@@ -22,12 +22,8 @@ if (Platform.OS === 'web') {
 interface Category { id: string; _id?: string; name: string; color: string; icon: string; }
 interface UserOption { id: string; email: string; name: string; role: string; }
 
-const ACCOUNTS = [
-  { value: AccountSource.UPI, icon: '📱', label: 'UPI' },
-  { value: AccountSource.Card, icon: '💳', label: 'Card' },
-  { value: AccountSource.BankAccount, icon: '🏦', label: 'Bank' },
-  { value: AccountSource.Cash, icon: '💵', label: 'Cash' },
-];
+interface Category { id: string; _id?: string; name: string; color: string; icon: string; }
+interface UserOption { id: string; email: string; name: string; role: string; }
 
 export default function ExpenseFormScreen() {
   const navigation = useNavigation<any>();
@@ -43,7 +39,8 @@ export default function ExpenseFormScreen() {
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
-  const [accountSource, setAccountSource] = useState<AccountSource | ''>('');
+  const [accountSources, setAccountSources] = useState<AccountSourceOption[]>([]);
+  const [accountSource, setAccountSource] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [screenLoading, setScreenLoading] = useState(true);
@@ -73,6 +70,7 @@ export default function ExpenseFormScreen() {
   useEffect(() => {
     (async () => {
       await loadCategories();
+      await loadAccountSources();
       if (isAdmin) await loadUsers();
       if (editingExpense) {
         try {
@@ -100,6 +98,13 @@ export default function ExpenseFormScreen() {
         setCategoryLoadError(false);
       } else { setCategoryLoadError(true); }
     } catch { setCategoryLoadError(true); }
+  }
+
+  async function loadAccountSources() {
+    try {
+      const res = await api.get('/account-sources');
+      if (res.data) setAccountSources(res.data);
+    } catch { /* silent */ }
   }
 
   async function loadUsers() {
@@ -228,12 +233,12 @@ export default function ExpenseFormScreen() {
             <View style={s.field}>
               <Text style={[s.label, { color: colors.text }]}>Account *</Text>
               <View style={s.grid}>
-                {ACCOUNTS.map((acc) => {
-                  const sel = accountSource === acc.value;
+                {accountSources.map((acc) => {
+                  const sel = accountSource === acc.label;
                   return (
-                    <TouchableOpacity key={acc.value} style={[s.gridItem, { borderColor: colors.border, backgroundColor: colors.inputBg }, sel && { borderColor: colors.primary, backgroundColor: isDark ? '#1a2a4a' : '#E8F4FF' }]} onPress={() => { setAccountSource(acc.value); setErrors({ ...errors, accountSource: '' }); }}>
+                    <TouchableOpacity key={acc.id} style={[s.gridItem, { borderColor: colors.border, backgroundColor: colors.inputBg }, sel && { borderColor: colors.primary, backgroundColor: isDark ? '#1a2a4a' : '#E8F4FF' }]} onPress={() => { setAccountSource(acc.label); setErrors({ ...errors, accountSource: '' }); }}>
                       <Text style={s.gridIcon}>{acc.icon}</Text>
-                      <Text style={[s.gridLabel, { color: colors.textSecondary }, sel && { color: colors.primary, fontWeight: '600' }]}>{acc.label}</Text>
+                      <Text style={s.gridLabel}>{acc.label}</Text>
                     </TouchableOpacity>
                   );
                 })}

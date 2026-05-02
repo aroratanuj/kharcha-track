@@ -5,7 +5,6 @@ import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../components/Toast';
 import FabButton from '../components/FabButton';
 import api from '../services/api';
-import { AccountSource } from '../types/expense';
 
 export default function ConfigScreen() {
   const { user } = useAuth();
@@ -156,64 +155,99 @@ function CategoriesManager({ colors, toast }: any) {
   );
 }
 
-const ACCOUNT_OPTIONS = [
-  { value: 'UPI', icon: '📱' },
-  { value: 'Card', icon: '💳' },
-  { value: 'Bank Account', icon: '🏦' },
-  { value: 'Cash', icon: '💵' },
-];
-
 function AccountsManager({ colors, toast }: any) {
-  const [accounts, setAccounts] = useState(ACCOUNT_OPTIONS);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newIcon, setNewIcon] = useState('');
-  const [newEnum, setNewEnum] = useState('');
 
-  function openAdd() { setNewLabel(''); setNewIcon(''); setNewEnum(''); setModalVisible(true); }
+  useEffect(() => { load(); }, []);
 
-  async function handleAdd() {
-    if (!newLabel.trim() || !newEnum.trim()) { toast.error('Label and value required'); return; }
-    if (accounts.find(a => a.value === newEnum)) { toast.error('Account type already exists'); return; }
-    setAccounts([...accounts, { value: newEnum, icon: newIcon || '💳' }]);
-    setModalVisible(false);
-    toast.success('Account option added (backend sync pending)');
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await api.get('/account-sources');
+      setAccounts(res.data || []);
+    } catch { toast.error('Failed to load accounts'); }
+    finally { setLoading(false); }
   }
 
-  function handleDelete(val: string) {
-    Alert.alert('Remove Account', 'Remove this account option?', [
+  function openAdd() { setNewLabel(''); setNewIcon(''); setModalVisible(true); }
+
+  async function handleAdd() {
+    if (!newLabel.trim()) { toast.error('Label is required'); return; }
+    try {
+      await api.post('/account-sources', { label: newLabel, icon: newIcon || '💳' });
+      toast.success('Account type added');
+      setModalVisible(false);
+      load();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Failed to add account';
+      toast.error(msg);
+    }
+  }
+
+  async function handleToggle(id: string, currentActive: boolean) {
+    try {
+      await api.put(`/account-sources/${id}`, { isActive: !currentActive });
+      toast.success(currentActive ? 'Account disabled' : 'Account enabled');
+      load();
+    } catch { toast.error('Failed to update'); }
+  }
+
+  function handleDelete(id: string, label: string) {
+    Alert.alert('Delete Account', `Delete "${label}"? Existing expenses using this account won't be affected.`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => {
-        setAccounts(accounts.filter(a => a.value !== val));
-        toast.success('Removed (backend sync pending)');
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await api.delete(`/account-sources/${id}`); toast.success('Deleted'); load(); }
+        catch { toast.error('Failed to delete'); }
       }},
     ]);
   }
 
   return (
     <View style={s.section}>
-      <Text style={[s.sectionNote, { color: colors.textMuted }]}>Account options are used when creating expenses. Changes here are frontend-only for now.</Text>
+      <Text style={[s.sectionNote, { color: colors.textMuted }]}>Account types shown when creating expenses. Active types are selectable.</Text>
       <TouchableOpacity style={[s.addBtn, { backgroundColor: colors.primary }]} onPress={openAdd}>
         <Text style={s.addBtnText}>+ Add Account Type</Text>
       </TouchableOpacity>
-      <FlatList data={accounts} keyExtractor={(item) => item.value} renderItem={({ item }) => (
-        <View style={[s.configItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={s.configItemLeft}>
-            <Text style={s.configItemIcon}>{item.icon}</Text>
-            <Text style={[s.configItemName, { color: colors.text }]}>{item.value}</Text>
+      <FlatList
+        data={accounts}
+        keyExtractor={(item) => item.id}
+        refreshing={loading}
+        onRefresh={load}
+        renderItem={({ item }) => (
+          <View style={[s.configItem, { backgroundColor: colors.card, borderColor: item.isActive ? colors.border : colors.border }, !item.isActive && { opacity: 0.5 }]}>
+            <View style={s.configItemLeft}>
+              <Text style={s.configItemIcon}>{item.icon}</Text>
+              <Text style={[s.configItemName, { color: colors.text }]}>{item.label}</Text>
+              {!item.isActive && <Text style={[s.inactiveBadge, { backgroundColor: colors.danger }]}>Inactive</Text>}
+            </View>
+            <View style={s.configItemActions}>
+              <TouchableOpacity style={s.actionBtnWrap} onPress={() => handleToggle(item.id, item.isActive)} accessibilityLabel={item.isActive ? 'Disable account' : 'Enable account'}>
+                <Text style={[s.actionBtn, { color: item.isActive ? colors.warning : colors.primary }]}>{item.isActive ? 'Disable' : 'Enable'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.actionBtnWrap} onPress={() => handleDelete(item.id, item.label)} accessibilityLabel="Delete account">
+                <Text style={[s.actionBtn, { color: colors.danger }]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <TouchableOpacity style={s.actionBtnWrap} onPress={() => handleDelete(item.value)} accessibilityLabel="Remove account">
-            <Text style={[s.actionBtn, { color: colors.danger }]}>Remove</Text>
-          </TouchableOpacity>
-        </View>
-      )} />
+        )}
+        ListEmptyComponent={
+          !loading ? (
+            <View style={s.empty}>
+              <Text style={[s.emptyText, { color: colors.textMuted }]}>No account types yet</Text>
+            </View>
+          ) : null
+        }
+      />
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
           <View style={[s.modal, { backgroundColor: colors.surface, shadowColor: colors.shadowColor }]}>
             <Text style={[s.modalTitle, { color: colors.text }]}>New Account Type</Text>
             <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={newLabel} onChangeText={setNewLabel} placeholder="Label (e.g. UPI)" placeholderTextColor={colors.textMuted} maxLength={50} />
             <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={newIcon} onChangeText={setNewIcon} placeholder="Icon (e.g. 📱)" placeholderTextColor={colors.textMuted} maxLength={10} />
-            <TextInput style={[s.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={newEnum} onChangeText={setNewEnum} placeholder="Enum value (e.g. Wallet)" placeholderTextColor={colors.textMuted} maxLength={50} />
             <View style={s.modalActions}>
               <TouchableOpacity style={[s.modalBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setModalVisible(false)}><Text style={[s.modalBtnText, { color: colors.text }]}>Cancel</Text></TouchableOpacity>
               <TouchableOpacity style={[s.modalBtn, { backgroundColor: colors.primary }]} onPress={handleAdd}><Text style={s.modalBtnText}>Add</Text></TouchableOpacity>

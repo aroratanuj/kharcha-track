@@ -3,11 +3,11 @@ export enum ExpenseStatus {
   CONFIRMED = 'confirmed',
 }
 
-export enum AccountSource {
-  UPI = 'UPI',
-  Card = 'Card',
-  BankAccount = 'Bank Account',
-  Cash = 'Cash',
+export interface AccountSourceOption {
+  id: string;
+  label: string;
+  icon: string;
+  isActive: boolean;
 }
 
 export interface Category {
@@ -27,7 +27,7 @@ export interface Expense {
   categoryId?: string;
   category?: Category;
   userId: string;
-  accountSource?: AccountSource;
+  accountSource?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
