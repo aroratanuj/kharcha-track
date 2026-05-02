@@ -34,10 +34,14 @@ export class ImapMonitorService {
         user,
         pass,
         secure: true,
-        authTimeout: 15000,
-        socketTimeout: 15000,
+        authTimeout: 30000,
+        socketTimeout: 60000,
         logger: false,
       } as any);
+
+      client.on('error', (err: any) => {
+        this.logger.error(`IMAP connection error: ${err.message}`);
+      });
 
       await client.connect();
 
