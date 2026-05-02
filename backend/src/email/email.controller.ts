@@ -13,6 +13,15 @@ export class EmailController {
     private emailSenderService: EmailSenderService,
   ) {}
 
+  @Post('test-parse')
+  async testParse(@Body() body: { email: string }) {
+    if (!body.email || typeof body.email !== 'string') {
+      throw new HttpException('Provide { "email": "raw email content" }', 400);
+    }
+    const result = await this.emailService.parseExpenseWithAI(body.email);
+    return { parsed: result };
+  }
+
   @Post('webhook')
   async handleMailgunWebhook(
     @Req() req: Request,

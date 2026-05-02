@@ -142,15 +142,52 @@ ${emailContent.substring(0, 3000)}
 
   private fallbackParsing(emailContent: string, subject?: string) {
     const text = [subject, emailContent].filter(Boolean).join('\n');
-    const amountMatch = text.match(/(?:Rs\.?|INR|₹|\$)\s*(\d+[,.]?\d*)/i);
-    const amount = amountMatch ? parseFloat(amountMatch[1].replace(',', '')) : 0;
-    const descMatch = subject && subject.length > 3 ? subject : 'Expense from email';
+
+    const amountMatch = text.match(/(?:Rs\.?|INR|₹|\$)\s*(\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?)/i);
+    const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
+
+    const dateMatch = text.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
+    let date = new Date().toISOString().split('T')[0];
+    if (dateMatch) {
+      let y = parseInt(dateMatch[3]);
+      if (y < 100) y += 2000;
+      const m = parseInt(dateMatch[2]);
+      const d = parseInt(dateMatch[1]);
+      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+    }
+
+    let merchant = 'Unknown';
+    const merchantPatterns = [
+      /at\s+(?:Upi\s+)?([A-Z][A-Za-z\s.]+?)(?:\s+is\s+Approved|\s+is\s+Declined|\.|\s*$)/im,
+      /at\s+([A-Z][A-Za-z\s.]+?)(?:\s+on\s+\d|\s+for\s+INR|\s+for\s+Rs|\.|\s*$)/im,
+      /merchant[:\s]+([A-Z][A-Za-z0-9\s.]+?)(?:\s*$|\n|\.)/im,
+      /paid\s+to\s+([A-Z][A-Za-z\s.]+?)(?:\s+on|\s+for|\.|\s*$)/im,
+      /to\s+([A-Z][A-Za-z0-9\s.]+?)\s+(?:via|using|on|for)\s/i,
+    ];
+    for (const pat of merchantPatterns) {
+      const m = text.match(pat);
+      if (m) {
+        merchant = m[1].trim().replace(/\s+/g, ' ');
+        if (merchant.length >= 2 && merchant.length <= 80) break;
+        merchant = 'Unknown';
+      }
+    }
+
+    let description = 'Expense from email';
+    if (subject && subject.length > 3) {
+      description = subject.replace(/^(Fwd?:?\s*)/i, '').trim();
+    }
+    if (amount > 0) {
+      description += ` - INR ${amount}`;
+    }
 
     return {
       amount,
-      description: descMatch,
-      merchant: 'Unknown',
-      date: new Date().toISOString().split('T')[0],
+      description,
+      merchant,
+      date,
       confidence: amount > 0 ? 'medium' : 'low',
     };
   }
