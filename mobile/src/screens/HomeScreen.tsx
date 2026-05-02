@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../components/Toast';
+import FabButton from '../components/FabButton';
 import api from '../services/api';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -147,11 +148,8 @@ export default function HomeScreen() {
             </View>
           }
         />
-
-        <TouchableOpacity style={[s.fab, { backgroundColor: colors.primary, shadowColor: colors.primary }]} onPress={() => navigation.navigate('ExpenseForm')}>
-          <Text style={s.fabText}>+</Text>
-        </TouchableOpacity>
       </View>
+      <FabButton />
     </View>
   );
 }
@@ -189,6 +187,4 @@ const s = StyleSheet.create({
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 6 },
   emptySub: { fontSize: 14, textAlign: 'center' },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 8 },
-  fabText: { fontSize: 28, color: '#fff', fontWeight: 'bold' },
 });

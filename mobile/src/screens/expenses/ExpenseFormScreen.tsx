@@ -132,7 +132,19 @@ export default function ExpenseFormScreen() {
       const method = editingExpense?.id ? 'put' : 'post';
       await api[method](url, data);
       toast.success(editingExpense ? 'Expense updated' : 'Expense created');
-      navigation.navigate('Home');
+      if (editingExpense) {
+        navigation.navigate('Home');
+      } else {
+        setAmount('');
+        setDescription('');
+        setCategoryId('');
+        setAccountSource('');
+        setDate(todayStr);
+        setErrors({});
+        submittingRef.current = false;
+        setLoading(false);
+        return;
+      }
     } catch (error: any) {
       toast.error('Failed to save expense');
     } finally { setLoading(false); submittingRef.current = false; }
@@ -219,9 +231,14 @@ export default function ExpenseFormScreen() {
               {errors.accountSource && <Text style={s.err}>{errors.accountSource}</Text>}
             </View>
 
-            <TouchableOpacity style={[s.submitBtn, { backgroundColor: isFormValid ? colors.primary : colors.border }, { marginTop: 8, marginBottom: 32 }]} onPress={handleSubmit} disabled={!isFormValid || loading}>
-              <Text style={[s.submitBtnText, { color: isFormValid ? colors.primaryText : colors.textMuted }]}>{loading ? 'Saving...' : editingExpense ? 'Update Expense' : 'Create Expense'}</Text>
-            </TouchableOpacity>
+            <View style={s.btnRow}>
+              <TouchableOpacity style={[s.cancelBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('Home')}>
+                <Text style={[s.cancelBtnText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.submitBtn, { backgroundColor: isFormValid ? colors.primary : colors.border }]} onPress={handleSubmit} disabled={!isFormValid || loading}>
+                <Text style={[s.submitBtnText, { color: isFormValid ? colors.primaryText : colors.textMuted }]}>{loading ? 'Saving...' : editingExpense ? 'Update Expense' : 'Create Expense'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -255,6 +272,9 @@ const s = StyleSheet.create({
   gridItem: { borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 2, width: '22%', minHeight: 60, justifyContent: 'center' },
   gridIcon: { fontSize: 20, marginBottom: 2 },
   gridLabel: { fontSize: 10, textAlign: 'center' },
-  submitBtn: { borderRadius: 10, padding: 16, alignItems: 'center' },
+  submitBtn: { borderRadius: 10, padding: 16, alignItems: 'center', flex: 1 },
   submitBtnText: { fontSize: 16, fontWeight: '600' },
+  btnRow: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 32 },
+  cancelBtn: { borderRadius: 10, padding: 16, alignItems: 'center', flex: 1, borderWidth: 1, minHeight: 48, justifyContent: 'center' },
+  cancelBtnText: { fontSize: 16, fontWeight: '600' },
 });

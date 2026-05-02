@@ -60,16 +60,16 @@ export class CreateExpenseDto {
   notes?: string;
 }
 
-const ALLOWED_UPDATE_FIELDS = ['amount', 'description', 'merchantName', 'date', 'categoryId', 'accountSource', 'notes'];
+const ALLOWED_UPDATE_FIELDS = ['amount', 'description', 'merchantName', 'date', 'categoryId', 'accountSource', 'notes'] as const;
 
 export class UpdateExpenseDto {
-  [ALLOWED_UPDATE_FIELDS[0] as string]?: number;
-  [ALLOWED_UPDATE_FIELDS[1] as string]?: string;
-  [ALLOWED_UPDATE_FIELDS[2] as string]?: string;
-  [ALLOWED_UPDATE_FIELDS[3] as string]?: string;
-  [ALLOWED_UPDATE_FIELDS[4] as string]?: string;
-  [ALLOWED_UPDATE_FIELDS[5] as string]?: string;
-  [ALLOWED_UPDATE_FIELDS[6] as string]?: string;
+  amount?: number;
+  description?: string;
+  merchantName?: string;
+  date?: string;
+  categoryId?: string;
+  accountSource?: string;
+  notes?: string;
 }
 
 export class CreateCategoryDto {
@@ -89,12 +89,12 @@ export class CreateCategoryDto {
   icon?: string;
 }
 
-const ALLOWED_CATEGORY_FIELDS = ['name', 'color', 'icon'];
+const ALLOWED_CATEGORY_FIELDS = ['name', 'color', 'icon'] as const;
 
 export class UpdateCategoryDto {
-  [ALLOWED_CATEGORY_FIELDS[0] as string]?: string;
-  [ALLOWED_CATEGORY_FIELDS[1] as string]?: string;
-  [ALLOWED_CATEGORY_FIELDS[2] as string]?: string;
+  name?: string;
+  color?: string;
+  icon?: string;
 }
 
 export class BulkConfirmDto {

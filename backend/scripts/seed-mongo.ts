@@ -40,7 +40,7 @@ async function seedCategories(db) {
 }
 
 async function seedUsers(db) {
-  const adminEmail = 'admin';
+  const adminEmail = 'admin@kharcha.com';
   const demoEmail = 'demo@kharcha.com';
   const adminPass = process.env.ADMIN_PASSWORD || 'admin1511';
   const demoPass = process.env.DEMO_PASSWORD || 'demo1234';

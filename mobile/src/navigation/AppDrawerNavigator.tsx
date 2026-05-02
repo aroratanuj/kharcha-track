@@ -15,6 +15,7 @@ import ConfigScreen from '../screens/ConfigScreen';
 function CustomDrawerContent(props: any) {
   const { user, signOut } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
+  const isAdmin = user?.role === 'admin';
 
   return (
     <View style={[styles.drawer, { backgroundColor: colors.drawerBg }]}>
@@ -24,7 +25,7 @@ function CustomDrawerContent(props: any) {
         </View>
         <Text style={[styles.profileName, { color: colors.text }]}>{user?.name || 'User'}</Text>
         <Text style={[styles.profileEmail, { color: colors.textMuted }]}>{user?.email || ''}</Text>
-        {user?.role === 'admin' && (
+        {isAdmin && (
           <View style={[styles.roleBadge, { backgroundColor: colors.warning }]}>
             <Text style={styles.roleBadgeText}>ADMIN</Text>
           </View>
@@ -33,24 +34,29 @@ function CustomDrawerContent(props: any) {
 
       <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
         <DrawerItemList {...props} />
-      </DrawerContentScrollView>
 
-      <View style={[styles.footer, { borderTopColor: colors.border }]}>
-        <TouchableOpacity style={[styles.footerItem, { borderBottomColor: colors.border }]} onPress={toggleTheme}>
-          <Text style={styles.footerIcon}>{isDark ? '☀️' : '🌙'}</Text>
-          <Text style={[styles.footerLabel, { color: colors.drawerItem }]}>{isDark ? 'Light Mode' : 'Dark Mode'}</Text>
+        <View style={styles.menuSeparator}>
+          <View style={[styles.separatorLine, { backgroundColor: colors.border }]} />
+        </View>
+
+        <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.drawerItemHover }]} onPress={toggleTheme}>
+          <Text style={styles.menuIcon}>{isDark ? '☀️' : '🌙'}</Text>
+          <Text style={[styles.menuLabel, { color: colors.drawerItem }]}>{isDark ? 'Light Mode' : 'Dark Mode'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem} onPress={() => { signOut(); }}>
-          <Text style={styles.footerIcon}>🚪</Text>
-          <Text style={[styles.footerLabel, { color: colors.danger }]}>Logout</Text>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => signOut()}>
+          <Text style={styles.menuIcon}>🚪</Text>
+          <Text style={[styles.menuLabel, { color: colors.danger }]}>Logout</Text>
         </TouchableOpacity>
-      </View>
+      </DrawerContentScrollView>
     </View>
   );
 }
 
 export default function AppDrawerNavigator() {
   const { colors } = useTheme();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   return (
     <Drawer.Navigator
@@ -79,21 +85,27 @@ export default function AppDrawerNavigator() {
         component={ExpenseFormScreen}
         options={{ drawerItemStyle: { display: 'none' }, title: 'Expense' }}
       />
-      <Drawer.Screen
-        name="BudgetDashboard"
-        component={BudgetDashboardScreen}
-        options={{ drawerLabel: '💰  Budgets', title: 'Budgets' }}
-      />
-      <Drawer.Screen
-        name="Analytics"
-        component={AnalyticsDashboardScreen}
-        options={{ drawerLabel: '📊  Analytics', title: 'Analytics' }}
-      />
-      <Drawer.Screen
-        name="Configuration"
-        component={ConfigScreen}
-        options={{ drawerLabel: '⚙️  Configuration', title: 'Configuration' }}
-      />
+      {isAdmin && (
+        <Drawer.Screen
+          name="BudgetDashboard"
+          component={BudgetDashboardScreen}
+          options={{ drawerLabel: '💰  Budgets', title: 'Budgets' }}
+        />
+      )}
+      {isAdmin && (
+        <Drawer.Screen
+          name="Analytics"
+          component={AnalyticsDashboardScreen}
+          options={{ drawerLabel: '📊  Analytics', title: 'Analytics' }}
+        />
+      )}
+      {isAdmin && (
+        <Drawer.Screen
+          name="Configuration"
+          component={ConfigScreen}
+          options={{ drawerLabel: '⚙️  Configuration', title: 'Configuration' }}
+        />
+      )}
     </Drawer.Navigator>
   );
 }
@@ -141,23 +153,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     letterSpacing: 1,
   },
-  footer: {
-    borderTopWidth: 1,
+  menuSeparator: {
     paddingVertical: 8,
+    paddingHorizontal: 8,
   },
-  footerItem: {
+  separatorLine: {
+    height: 1,
+    opacity: 0.3,
+  },
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderBottomWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginHorizontal: 8,
     borderRadius: 8,
+    minHeight: 44,
   },
-  footerIcon: {
+  menuIcon: {
     fontSize: 18,
     width: 28,
   },
-  footerLabel: {
+  menuLabel: {
     fontSize: 15,
     fontWeight: '500',
   },

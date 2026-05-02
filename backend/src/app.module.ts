@@ -20,9 +20,6 @@ import { AccountSourceModule } from './account-source/account-source.module';
         path.resolve(process.cwd(), '.env'),
         path.resolve(process.cwd(), '../.env'),
       ],
-      validationSchema: {
-        isGlobal: true,
-      },
     }),
     MongooseModule.forRoot(process.env.MONGODB_URI || process.env.DATABASE_URL),
     ThrottlerModule.forRoot([

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+import FabButton from '../../components/FabButton';
 
 export default function BudgetDashboardScreen() {
   const { colors } = useTheme();
@@ -16,6 +17,7 @@ export default function BudgetDashboardScreen() {
           </View>
         </View>
       </View>
+      <FabButton />
     </View>
   );
 }

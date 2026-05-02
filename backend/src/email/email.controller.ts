@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { Controller, Post, Req, Res, RawBodyRequest, HttpException, Logger } from '@nestjs/common';
+import { Controller, Post, Req, Res, Body, RawBodyRequest, HttpException, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { EmailService } from './email.service';
 

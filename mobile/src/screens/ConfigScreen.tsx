@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Modal, A
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../components/Toast';
+import FabButton from '../components/FabButton';
 import api from '../services/api';
 import { AccountSource } from '../types/expense';
 
@@ -36,6 +37,7 @@ export default function ConfigScreen() {
           </>
         )}
       </View>
+      <FabButton />
     </View>
   );
 }

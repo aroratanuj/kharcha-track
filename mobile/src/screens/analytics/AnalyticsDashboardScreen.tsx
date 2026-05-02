@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+import FabButton from '../../components/FabButton';
 
 export default function AnalyticsDashboardScreen() {
   const { colors } = useTheme();
@@ -16,6 +17,7 @@ export default function AnalyticsDashboardScreen() {
           </View>
         </View>
       </View>
+      <FabButton />
     </View>
   );
 }
