@@ -12,6 +12,7 @@ import { BudgetsModule } from './budgets/budgets.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { EmailModule } from './email/email.module';
 import { AccountSourceModule } from './account-source/account-source.module';
+import { THROTTLER_CONFIG } from './constants/throttler.config';
 
 @Module({
   imports: [
@@ -24,11 +25,7 @@ import { AccountSourceModule } from './account-source/account-source.module';
     }),
     MongooseModule.forRoot(process.env.MONGODB_URI || process.env.DATABASE_URL),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([
-      { name: 'short', ttl: 1000, limit: 100 },
-      { name: 'medium', ttl: 10000, limit: 500 },
-      { name: 'webhook', ttl: 60000, limit: 20 },
-    ]),
+    ThrottlerModule.forRoot(THROTTLER_CONFIG),
     AuthModule,
     ExpensesModule,
     CategoriesModule,

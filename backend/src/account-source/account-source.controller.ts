@@ -9,7 +9,7 @@ export class AccountSourceController {
   constructor(private service: AccountSourceService) {}
 
   @Get()
-  async findAll() {
+  async findActive() {
     return this.service.findActive();
   }
 
