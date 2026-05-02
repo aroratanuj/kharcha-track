@@ -5,6 +5,7 @@ import { User, UserSchema } from '../schemas/user.schema';
 import { EmailService } from './email.service';
 import { EmailSenderService } from './email-sender.service';
 import { EmailController } from './email.controller';
+import { ImapMonitorService } from './imap-monitor.service';
 
 @Module({
   imports: [
@@ -14,6 +15,6 @@ import { EmailController } from './email.controller';
     ]),
   ],
   controllers: [EmailController],
-  providers: [EmailService, EmailSenderService],
+  providers: [EmailService, EmailSenderService, ImapMonitorService],
 })
 export class EmailModule {}

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import * as path from 'path';
 import { AuthModule } from './auth/auth.module';
@@ -22,6 +23,7 @@ import { AccountSourceModule } from './account-source/account-source.module';
       ],
     }),
     MongooseModule.forRoot(process.env.MONGODB_URI || process.env.DATABASE_URL),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       { name: 'short', ttl: 1000, limit: 30 },
       { name: 'medium', ttl: 10000, limit: 200 },
