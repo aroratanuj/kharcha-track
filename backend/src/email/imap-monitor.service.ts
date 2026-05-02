@@ -23,8 +23,12 @@ export class ImapMonitorService {
     const user = process.env.IMAP_USER;
     const pass = process.env.IMAP_PASS;
 
-    if (!host || !user || !pass) return;
+    if (!host || !user || !pass) {
+      this.logger.warn(`IMAP not configured: HOST=${!!host}, USER=${!!user}, PASS=${!!pass}`);
+      return;
+    }
 
+    this.logger.log(`IMAP polling ${user}@${host}...`);
     this.isRunning = true;
 
     try {
