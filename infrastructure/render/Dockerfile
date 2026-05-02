@@ -1,24 +1,16 @@
-# Use Node.js LTS
-FROM node:18-alpine
+FROM node:20-alpine
 
-# Set working directory
-WORKDIR /app
+WORKDIR /app/backend
 
-# Copy package files
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+RUN npm ci
 
-# Copy source code
 COPY . .
 
-# Build the application
 RUN npm run build
 
-# Expose port
 EXPOSE 3000
 
-# Start the application
 CMD ["npm", "run", "start:prod"]
