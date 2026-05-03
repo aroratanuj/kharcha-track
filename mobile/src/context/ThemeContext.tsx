@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ThemeMode = 'light' | 'dark';
 
-interface ThemeColors {
+export interface ThemeColors {
   bg: string;
   surface: string;
   card: string;
@@ -12,6 +12,7 @@ interface ThemeColors {
   textMuted: string;
   border: string;
   primary: string;
+  primaryLight: string;
   primaryText: string;
   danger: string;
   success: string;
@@ -20,11 +21,18 @@ interface ThemeColors {
   inputBorder: string;
   screenBorder: string;
   headerBg: string;
-  drawerBg: string;
-  drawerItem: string;
-  drawerItemActive: string;
   filterBg: string;
   shadowColor: string;
+  tabBg: string;
+  tabActive: string;
+  tabInactive: string;
+  skeleton: string;
+  skeletonShimmer: string;
+  cardAlt: string;
+  coral: string;
+  drawerBg: string;
+  drawerItem: string;
+  drawerItemHover: string;
 }
 
 interface ThemeContextData {
@@ -32,54 +40,71 @@ interface ThemeContextData {
   colors: ThemeColors;
   isDark: boolean;
   toggleTheme: () => void;
+  fontFamily: string;
 }
 
 const lightColors: ThemeColors = {
-  bg: '#F5F5F5',
+  bg: '#F5F5F7',
   surface: '#FFFFFF',
   card: '#FFFFFF',
-  text: '#000000',
-  textSecondary: '#555555',
-  textMuted: '#999999',
-  border: '#E0E0E0',
-  primary: '#007AFF',
+  cardAlt: '#F8F8FC',
+  text: '#1C1C2E',
+  textSecondary: '#6B6B80',
+  textMuted: '#A0A0B8',
+  border: '#E5E5EA',
+  primary: '#6C4EF2',
+  primaryLight: '#8B6FF7',
   primaryText: '#FFFFFF',
   danger: '#FF3B30',
-  success: '#34C759',
-  warning: '#FF9500',
-  inputBg: '#FFFFFF',
-  inputBorder: '#E0E0E0',
-  screenBorder: '#D0D0D0',
+  success: '#2ECC71',
+  warning: '#F5A623',
+  inputBg: '#F5F5F7',
+  inputBorder: '#E5E5EA',
+  screenBorder: '#E5E5EA',
   headerBg: '#FFFFFF',
+  filterBg: '#F0F0F5',
+  shadowColor: 'rgba(0,0,0,0.08)',
+  tabBg: '#FFFFFF',
+  tabActive: '#6C4EF2',
+  tabInactive: '#A0A0B8',
+  skeleton: '#E5E5EA',
+  skeletonShimmer: '#F5F5F7',
+  coral: '#E85D3A',
   drawerBg: '#FFFFFF',
-  drawerItem: '#333333',
-  drawerItemActive: '#007AFF',
-  filterBg: '#007AFF',
-  shadowColor: '#000000',
+  drawerItem: '#1C1C2E',
+  drawerItemHover: '#F0F0F5',
 };
 
 const darkColors: ThemeColors = {
-  bg: '#121212',
-  surface: '#1E1E1E',
-  card: '#2C2C2E',
-  text: '#FFFFFF',
-  textSecondary: '#A0A0A0',
-  textMuted: '#888888',
-  border: '#3A3A3C',
-  primary: '#0A84FF',
+  bg: '#0F0F1A',
+  surface: '#1C1C2E',
+  card: '#242438',
+  cardAlt: '#2A2A40',
+  text: '#F5F5F7',
+  textSecondary: '#A0A0B8',
+  textMuted: '#6B6B80',
+  border: '#2A2A3D',
+  primary: '#6C4EF2',
+  primaryLight: '#8B6FF7',
   primaryText: '#FFFFFF',
   danger: '#FF453A',
   success: '#30D158',
   warning: '#FF9F0A',
-  inputBg: '#2C2C2E',
-  inputBorder: '#3A3A3C',
-  screenBorder: '#3A3A3C',
-  headerBg: '#1E1E1E',
-  drawerBg: '#1E1E1E',
+  inputBg: '#242438',
+  inputBorder: '#2A2A3D',
+  screenBorder: '#2A2A3D',
+  headerBg: '#1C1C2E',
+  filterBg: '#2A2A40',
+  shadowColor: 'rgba(0,0,0,0.3)',
+  tabBg: '#1C1C2E',
+  tabActive: '#6C4EF2',
+  tabInactive: '#6B6B80',
+  skeleton: '#2A2A3D',
+  skeletonShimmer: '#363650',
+  coral: '#E85D3A',
+  drawerBg: '#1C1C2E',
   drawerItem: '#E0E0E0',
-  drawerItemActive: '#0A84FF',
-  filterBg: '#0A84FF',
-  shadowColor: '#000000',
+  drawerItemHover: '#2A2A40',
 };
 
 const ThemeContext = createContext<ThemeContextData>({} as ThemeContextData);
@@ -103,7 +128,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const colors = isDark ? darkColors : lightColors;
 
   return (
-    <ThemeContext.Provider value={{ mode, colors, isDark, toggleTheme }}>
+    <ThemeContext.Provider value={{ mode, colors, isDark, toggleTheme, fontFamily: 'PlusJakartaSans' }}>
       {children}
     </ThemeContext.Provider>
   );
