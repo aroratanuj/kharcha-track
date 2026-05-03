@@ -47,6 +47,7 @@ export default function DraftReviewScreen() {
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -114,28 +115,83 @@ export default function DraftReviewScreen() {
     }
   }
 
+  async function handleSave() {
+    if (!current) return;
+    setSaving(true);
+    try {
+      const newAmount = parseFloat(amount) || current.amount;
+      const newDesc = description.trim() || current.description;
+      const newDate = date ? `${date}T00:00:00.000Z` : current.date;
+      const newCatId = categoryId || null;
+      const newAcc = accountSource || null;
+
+      const hasChanges =
+        newAmount !== current.amount ||
+        newDesc !== current.description ||
+        newDate !== current.date ||
+        newCatId !== (current.categoryId?._id || current.categoryId || current.category?.id) ||
+        newAcc !== current.accountSource;
+
+      if (!hasChanges) {
+        toast.info('No changes to save');
+        setSaving(false);
+        return;
+      }
+
+      const data: any = { amount: newAmount, description: newDesc, date: newDate };
+      if (categoryId) data.categoryId = categoryId;
+      if (accountSource) data.accountSource = accountSource;
+      await api.put(`/expenses/${current.id}`, data);
+      toast.success('Draft saved');
+      setDrafts((prev) =>
+        prev.map((d) =>
+          d.id === current.id
+            ? { ...d, amount: newAmount, description: newDesc, accountSource: newAcc || d.accountSource }
+            : d,
+        ),
+      );
+    } catch {
+      toast.error('Failed to save draft');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleConfirm() {
     if (!current) return;
     setConfirming(true);
     try {
-      const data: any = {
-        amount: parseFloat(amount) || current.amount,
-        description: description.trim() || current.description,
-        date: date ? `${date}T00:00:00.000Z` : current.date,
-      };
-      if (categoryId) data.categoryId = categoryId;
-      if (accountSource) data.accountSource = accountSource;
-      await api.put(`/expenses/${current.id}`, data);
+      const newAmount = parseFloat(amount) || current.amount;
+      const newDesc = description.trim() || current.description;
+      const newDate = date ? `${date}T00:00:00.000Z` : current.date;
+      const newCatId = categoryId || null;
+      const newAcc = accountSource || null;
+
+      const hasChanges =
+        newAmount !== current.amount ||
+        newDesc !== current.description ||
+        newDate !== current.date ||
+        newCatId !== (current.categoryId?._id || current.categoryId || current.category?.id) ||
+        newAcc !== current.accountSource;
+
+      if (hasChanges) {
+        const data: any = { amount: newAmount, description: newDesc, date: newDate };
+        if (categoryId) data.categoryId = categoryId;
+        if (accountSource) data.accountSource = accountSource;
+        await api.put(`/expenses/${current.id}`, data);
+      }
+
       await api.post(`/expenses/${current.id}/confirm`);
       toast.success('Expense confirmed');
+
       if (drafts.length > 1) {
         setDrafts((prev) => prev.filter((d) => d.id !== current.id));
       } else {
         navigation.goBack();
         return;
       }
-    } catch {
-      toast.error('Failed to confirm');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to confirm');
     } finally {
       setConfirming(false);
     }
@@ -182,6 +238,9 @@ export default function DraftReviewScreen() {
       <View style={[s.screenBorder, { backgroundColor: colors.surface, borderColor: colors.screenBorder }]}>
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator>
           <View style={s.header}>
+            <TouchableOpacity onPress={handleDelete} style={s.headerDelete} hitSlop={10}>
+              <Text style={{ color: '#FF3B30', fontSize: 18 }}>🗑</Text>
+            </TouchableOpacity>
             <Text style={[s.headerTitle, { color: colors.text }]}>
               Draft {currentIndex + 1} of {drafts.length}
             </Text>
@@ -299,16 +358,17 @@ export default function DraftReviewScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[s.deleteBtn, { backgroundColor: isDark ? '#3a2020' : '#FFF0F0' }]}
-              onPress={handleDelete}
+              style={[s.saveBtn, { backgroundColor: isDark ? '#1a2a1a' : '#E8F5E9', opacity: saving ? 0.6 : 1 }]}
+              onPress={handleSave}
+              disabled={saving || confirming}
             >
-              <Text style={[s.deleteBtnText, { color: '#FF3B30' }]}>Delete</Text>
+              <Text style={s.saveBtnText}>{saving ? 'Saving...' : '💾 Save'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[s.confirmBtn, { backgroundColor: colors.primary, opacity: confirming ? 0.6 : 1 }]}
               onPress={handleConfirm}
-              disabled={confirming}
+              disabled={saving || confirming}
             >
               <Text style={s.confirmBtnText}>{confirming ? 'Confirming...' : '✓ Confirm'}</Text>
             </TouchableOpacity>
@@ -369,7 +429,8 @@ const s = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 16 },
   backBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10, borderWidth: 1, minHeight: 44, justifyContent: 'center' },
   backBtnText: { fontSize: 16, fontWeight: '600' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 16, paddingBottom: 8, paddingHorizontal: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 16, paddingBottom: 8, paddingHorizontal: 16, position: 'relative' },
+  headerDelete: { position: 'absolute', left: 16, padding: 8 },
   headerTitle: { fontSize: 18, fontWeight: '700' },
   methodBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   methodText: { fontSize: 12, fontWeight: '700' },
@@ -397,8 +458,8 @@ const s = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20, gap: 8 },
   navBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, borderWidth: 1, minHeight: 44, justifyContent: 'center' },
   navBtnText: { fontSize: 14, fontWeight: '600' },
-  deleteBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, minHeight: 44, justifyContent: 'center' },
-  deleteBtnText: { fontSize: 14, fontWeight: '600' },
+  saveBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, minHeight: 44, justifyContent: 'center' },
+  saveBtnText: { fontSize: 14, fontWeight: '600', color: '#34C759' },
   confirmBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, minHeight: 44, justifyContent: 'center' },
   confirmBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 });

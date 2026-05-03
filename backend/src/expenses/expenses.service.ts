@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Expense, ExpenseDocument } from '../schemas/expense.schema';
 import { Category, CategoryDocument } from '../schemas/category.schema';
+import { User, UserDocument } from '../schemas/user.schema';
 
 const ALLOWED_UPDATE_FIELDS = ['amount', 'description', 'merchantName', 'date', 'categoryId', 'accountSource', 'notes', 'status'];
 
@@ -11,6 +12,7 @@ export class ExpensesService {
   constructor(
     @InjectModel(Expense.name) private expenseModel: Model<ExpenseDocument>,
     @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
   async create(
@@ -171,10 +173,15 @@ export class ExpensesService {
   }
 
   async update(id: string, userId: string, updates: any): Promise<any> {
-    const expense = await this.expenseModel.findOne({
-      _id: id,
-      userId: new Types.ObjectId(userId),
-    });
+    const user = await this.userModel.findById(userId).lean();
+    const isAdmin = user?.role === 'admin';
+
+    const filter: any = { _id: id };
+    if (!isAdmin) {
+      filter.userId = new Types.ObjectId(userId);
+    }
+
+    const expense = await this.expenseModel.findOne(filter);
 
     if (!expense) {
       throw new NotFoundException('Expense not found');
