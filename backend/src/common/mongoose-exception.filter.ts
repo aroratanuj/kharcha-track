@@ -1,16 +1,15 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import { Error as MongooseError } from 'mongoose';
-import { MongoError } from 'mongodb';
 
-@Catch(MongooseError.ValidationError, MongooseError.CastError)
+@Catch()
 export class MongooseExceptionFilter implements ExceptionFilter {
-  catch(exception: MongooseError.ValidationError | MongooseError.CastError, host: ArgumentsHost) {
+  catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 
     if (exception instanceof MongooseError.ValidationError) {
-      const messages = Object.values(exception.errors).map(e => e.message);
+      const messages = Object.values(exception.errors).map((e: any) => e.message);
       response.status(HttpStatus.BAD_REQUEST).json({
         statusCode: HttpStatus.BAD_REQUEST,
         message: 'Validation failed',
@@ -19,18 +18,13 @@ export class MongooseExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    response.status(HttpStatus.BAD_REQUEST).json({
-      statusCode: HttpStatus.BAD_REQUEST,
-      message: exception.message,
-    });
-  }
-}
-
-@Catch(MongoError)
-export class MongoExceptionFilter implements ExceptionFilter {
-  catch(exception: MongoError, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
+    if (exception instanceof MongooseError.CastError) {
+      response.status(HttpStatus.BAD_REQUEST).json({
+        statusCode: HttpStatus.BAD_REQUEST,
+        message: exception.message,
+      });
+      return;
+    }
 
     if (exception.code === 11000) {
       response.status(HttpStatus.CONFLICT).json({
@@ -40,9 +34,17 @@ export class MongoExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    if (exception.name === 'MongoError' || exception.name === 'MongoServerError') {
+      response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Database error',
+      });
+      return;
+    }
+
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-      message: 'Database error',
+      message: exception.message || 'Internal server error',
     });
   }
 }

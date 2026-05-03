@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { logLevelMiddleware } from './common/log-level.middleware';
-import { MongooseExceptionFilter, MongoExceptionFilter } from './common/mongoose-exception.filter';
+import { MongooseExceptionFilter } from './common/mongoose-exception.filter';
 import helmet from 'helmet';
 import * as express from 'express';
 
@@ -14,10 +14,11 @@ async function bootstrap() {
   app.use(express.json({ limit: '1mb' }));
 
   const allowedOrigins = [
+    process.env.MOBILE_APP_URL,
+    process.env.APP_URL,
     'http://localhost:8081',
     'exp://localhost:19000',
     'http://localhost:19006',
-    process.env.MOBILE_APP_URL,
   ].filter(Boolean);
 
   if (!allowedOrigins.length) {
@@ -38,7 +39,7 @@ async function bootstrap() {
   );
 
   app.setGlobalPrefix('api');
-  app.useGlobalFilters(new MongooseExceptionFilter(), new MongoExceptionFilter());
+  app.useGlobalFilters(new MongooseExceptionFilter());
   app.use(logLevelMiddleware);
 
   const port = process.env.PORT || 3000;
