@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { logLevelMiddleware } from './common/log-level.middleware';
+import { MongooseExceptionFilter, MongoExceptionFilter } from './common/mongoose-exception.filter';
 import helmet from 'helmet';
 import * as express from 'express';
 
@@ -37,6 +38,7 @@ async function bootstrap() {
   );
 
   app.setGlobalPrefix('api');
+  app.useGlobalFilters(new MongooseExceptionFilter(), new MongoExceptionFilter());
   app.use(logLevelMiddleware);
 
   const port = process.env.PORT || 3000;

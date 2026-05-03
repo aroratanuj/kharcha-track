@@ -82,6 +82,7 @@ const cf = StyleSheet.create({
 export default function DraftReviewScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const draftId = route.params?.draftId ?? null;
   const initialIndex = route.params?.index ?? 0;
   const { user } = useAuth();
   const { colors, isDark, fontFamily } = useTheme();
@@ -129,8 +130,7 @@ export default function DraftReviewScreen() {
 
   useEffect(() => {
     if (drafts.length === 0) return;
-    const idx = Math.min(currentIndex, drafts.length - 1);
-    const d = drafts[idx];
+    const d = drafts[currentIndex];
     if (!d) return;
     setAmount(d.amount ? String(d.amount) : '');
     setDescription(d.description || '');
@@ -143,12 +143,27 @@ export default function DraftReviewScreen() {
     }
   }, [currentIndex, drafts]);
 
+  useEffect(() => {
+    if (drafts.length === 0) return;
+    let idx = draftId ? drafts.findIndex(d => d.id === draftId) : initialIndex;
+    if (idx < 0) idx = 0;
+    idx = Math.min(idx, drafts.length - 1);
+    setCurrentIndex(idx);
+  }, [drafts, draftId, initialIndex]);
+
   const current = drafts[currentIndex] || null;
   const fieldConf = current?.metadata?.fieldConfidence;
 
   function goTo(dir: 1 | -1) {
     const next = currentIndex + dir;
     if (next >= 0 && next < drafts.length) setCurrentIndex(next);
+  }
+
+  function normalizeDate(d: any): string {
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return '';
+    return `${dt.getFullYear()}-${(dt.getMonth() + 1).toString().padStart(2, '0')}-${dt.getDate().toString().padStart(2, '0')}`;
   }
 
   async function handleSave() {
@@ -158,11 +173,12 @@ export default function DraftReviewScreen() {
       const newAmount = parseFloat(amount) || current.amount;
       const newDesc = description.trim() || current.description;
       const newDate = date ? `${date}T00:00:00.000Z` : current.date;
+      const curCatId = current.categoryId?._id || current.categoryId || current.category?.id || '';
       const hasChanges =
         newAmount !== current.amount ||
         newDesc !== current.description ||
-        newDate !== current.date ||
-        categoryId !== (current.categoryId?._id || current.categoryId || current.category?.id) ||
+        normalizeDate(newDate) !== normalizeDate(current.date) ||
+        categoryId !== curCatId ||
         accountSource !== current.accountSource;
       if (!hasChanges) { toast.info('No changes to save'); setSaving(false); return; }
       const data: any = { amount: newAmount, description: newDesc, date: newDate };
@@ -181,11 +197,12 @@ export default function DraftReviewScreen() {
       const newAmount = parseFloat(amount) || current.amount;
       const newDesc = description.trim() || current.description;
       const newDate = date ? `${date}T00:00:00.000Z` : current.date;
+      const curCatId = current.categoryId?._id || current.categoryId || current.category?.id || '';
       const hasChanges =
         newAmount !== current.amount ||
         newDesc !== current.description ||
-        newDate !== current.date ||
-        categoryId !== (current.categoryId?._id || current.categoryId || current.category?.id) ||
+        normalizeDate(newDate) !== normalizeDate(current.date) ||
+        categoryId !== curCatId ||
         accountSource !== current.accountSource;
       if (hasChanges) {
         const data: any = { amount: newAmount, description: newDesc, date: newDate };
@@ -195,9 +212,8 @@ export default function DraftReviewScreen() {
       }
       await api.post(`/expenses/${current.id}/confirm`);
       toast.success('Expense confirmed');
-      if (drafts.length > 1) {
-        setDrafts(prev => prev.filter(d => d.id !== current.id));
-      } else {
+      setDrafts(prev => prev.filter(d => d.id !== current.id));
+      if (drafts.length <= 1) {
         navigation.goBack();
         return;
       }
@@ -212,10 +228,14 @@ export default function DraftReviewScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try {
-          await api.delete(`/expenses/${current.id}`);
-          toast.success('Draft deleted');
-          if (drafts.length > 1) setDrafts(prev => prev.filter(d => d.id !== current.id));
-          else navigation.goBack();
+      await api.delete(`/expenses/${current.id}`);
+      toast.success('Draft deleted');
+      setDrafts(prev => {
+        const next = prev.filter(d => d.id !== current.id);
+        if (next.length === 0) return next;
+        return next;
+      });
+      if (drafts.length <= 1) navigation.goBack();
         } catch { toast.error('Failed to delete'); }
       }},
     ]);
@@ -308,7 +328,7 @@ export default function DraftReviewScreen() {
           </ConfidenceField>
 
           <ConfidenceField label="Date" conf={fieldConf?.date} colors={colors} fontFamily={fontFamily}>
-            <DatePicker label="" value={date} onChange={setDate} error="" />
+            <DatePicker value={date} onChange={setDate} />
           </ConfidenceField>
 
           <ConfidenceField label="Account" conf={fieldConf?.accountSource} colors={colors} fontFamily={fontFamily}>
@@ -322,7 +342,7 @@ export default function DraftReviewScreen() {
                     onPress={() => setAccountSource(src.label)}
                   >
                     <Text style={s.chipIcon}>{src.icon}</Text>
-                    <Text style={[s.chipLabel, { color: sel ? colors.primary : colors.textSecondary, fontFamily }]} numberOfLines={1}>{src.label}</Text>
+                    <Text style={[s.chipLabel, { color: sel ? colors.primary : colors.textMuted, fontFamily }]} numberOfLines={1}>{src.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -340,7 +360,7 @@ export default function DraftReviewScreen() {
                     onPress={() => setCategoryId(cat.id)}
                   >
                     <Text style={s.chipIcon}>{cat.icon}</Text>
-                    <Text style={[s.chipLabel, { color: sel ? colors.primary : colors.textSecondary, fontFamily }]} numberOfLines={1}>{cat.name}</Text>
+                    <Text style={[s.chipLabel, { color: sel ? colors.primary : colors.textMuted, fontFamily }]} numberOfLines={1}>{cat.name}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -417,7 +437,7 @@ export default function DraftReviewScreen() {
 const s = StyleSheet.create({
   outer: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingBottom: 40 },
+  scrollContent: { paddingBottom: 200 },
   hero: { marginHorizontal: 16, marginTop: 12, padding: 20, borderRadius: 16 },
   heroDark: { backgroundColor: '#2A1F5E' },
   heroLight: { backgroundColor: '#6C4EF2' },
@@ -452,7 +472,7 @@ const s = StyleSheet.create({
   emptySub: { fontSize: 14, textAlign: 'center', marginBottom: 4 },
   backBtn: { paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14, marginTop: 16 },
   backBtnText: { fontSize: 16, fontWeight: '600', color: '#fff', textAlign: 'center' },
-  footer: { borderTopWidth: 1, paddingTop: 12, paddingBottom: 8 },
+  footer: { borderTopWidth: 1, paddingTop: 12, paddingBottom: 34 },
   footerActions: { flexDirection: 'row', gap: 12, paddingHorizontal: 16 },
   actionBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48 },
   actionBtnText: { fontSize: 15, fontWeight: '600' },

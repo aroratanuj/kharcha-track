@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -27,6 +27,8 @@ interface DraftExpense {
   };
 }
 
+interface UserItem { id: string; name: string; email: string; role: string; }
+
 function confColor(conf?: string) {
   if (conf === 'high') return '#2ECC71';
   if (conf === 'medium') return '#F5A623';
@@ -50,11 +52,16 @@ function relativeTime(dateStr: string): string {
 export default function DraftExpensesScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
-  const { colors, isDark, fontFamily } = useTheme();
+  const { colors, fontFamily } = useTheme();
   const toast = useToast();
   const isAdmin = user?.role === 'admin';
+
   const [drafts, setDrafts] = useState<DraftExpense[]>([]);
+  const [allDrafts, setAllDrafts] = useState<DraftExpense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [showUserPicker, setShowUserPicker] = useState(false);
 
   const loadDrafts = useCallback(async () => {
     setLoading(true);
@@ -65,7 +72,8 @@ export default function DraftExpensesScreen() {
       } else {
         res = await api.get('/expenses/drafts');
       }
-      setDrafts(res.data);
+      setAllDrafts(res.data || []);
+      setDrafts(res.data || []);
     } catch {
       toast.error('Failed to load drafts');
     } finally {
@@ -73,7 +81,44 @@ export default function DraftExpensesScreen() {
     }
   }, [toast, isAdmin]);
 
-  useFocusEffect(() => { loadDrafts(); });
+  const loadUsers = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const res = await api.get('/auth/users');
+      if (res.data) setUsers(res.data);
+    } catch { /* silent */ }
+  }, [isAdmin]);
+
+  useFocusEffect(() => { loadDrafts(); loadUsers(); });
+
+  useEffect(() => {
+    if (selectedUsers.size === 0) {
+      setDrafts(allDrafts);
+    } else {
+      setDrafts(allDrafts.filter(d => {
+        const uid = d.user?.id || (d as any).userId;
+        return uid && selectedUsers.has(uid);
+      }));
+    }
+  }, [selectedUsers, allDrafts]);
+
+  function toggleUser(uid: string) {
+    setSelectedUsers(prev => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      return next;
+    });
+  }
+
+  function filterLabel(): string {
+    if (selectedUsers.size === 0) return 'All Users';
+    if (selectedUsers.size === 1) {
+      const u = users.find(u => u.id === [...selectedUsers][0]);
+      return u ? u.name : '1 user';
+    }
+    return `${selectedUsers.size} users`;
+  }
 
   function renderItem({ item, index }: { item: DraftExpense; index: number }) {
     const isEmail = item.metadata?.source === 'email';
@@ -85,7 +130,7 @@ export default function DraftExpensesScreen() {
     return (
       <TouchableOpacity
         style={[s.card, isAlt && { backgroundColor: colors.cardAlt }]}
-        onPress={() => navigation.navigate('DraftReview', { index })}
+        onPress={() => navigation.navigate('DraftReview', { draftId: item.id })}
         activeOpacity={0.7}
       >
         <View style={[s.cardIcon, { backgroundColor: `${item.category?.color || colors.primary}18` }]}>
@@ -154,24 +199,36 @@ export default function DraftExpensesScreen() {
       >
         <View style={s.header}>
           <Text style={[s.headerTitle, { color: colors.text, fontFamily }]}>Drafts</Text>
-          {drafts.length > 0 && !loading && (
-            <View style={[s.countBadge, { backgroundColor: `${colors.primary}18` }]}>
-              <Text style={[s.countText, { color: colors.primary, fontFamily }]}>{drafts.length}</Text>
-            </View>
-          )}
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            {drafts.length > 0 && !loading && (
+              <View style={[s.countBadge, { backgroundColor: `${colors.primary}18` }]}>
+                <Text style={[s.countText, { color: colors.primary, fontFamily }]}>{drafts.length}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {isAdmin && (
-          <View style={[s.adminBar, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}20` }]}>
-            <Text style={{ fontSize: 12 }}>👁️</Text>
-            <Text style={[s.adminText, { color: colors.primary, fontFamily }]}>Viewing all users' drafts</Text>
-          </View>
+          <TouchableOpacity
+            style={[s.filterBar, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}20` }]}
+            onPress={() => setShowUserPicker(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 14 }}>👤</Text>
+            <Text style={[s.filterLabel, { color: colors.text, fontFamily }]}>Filter: {filterLabel()}</Text>
+            {selectedUsers.size > 0 && (
+              <TouchableOpacity hitSlop={12} onPress={() => setSelectedUsers(new Set())}>
+                <Text style={[s.clearBtn, { color: colors.primary, fontFamily }]}>Clear</Text>
+              </TouchableOpacity>
+            )}
+            <Text style={[s.filterArrow, { color: colors.textMuted }]}>›</Text>
+          </TouchableOpacity>
         )}
 
         {loading ? (
           renderLoading()
         ) : drafts.length > 0 ? (
-          drafts.map((item, index) => renderItem({ item, index }))
+          drafts.map((item, index) => <View key={item.id}>{renderItem({ item, index })}</View>)
         ) : (
           <View style={s.empty}>
             <View style={s.emptyArt}>
@@ -180,11 +237,57 @@ export default function DraftExpensesScreen() {
               <Text style={s.emptyLine}>╰──────────────╯</Text>
             </View>
             <Text style={[s.emptyTitle, { color: colors.text, fontFamily }]}>No Pending Drafts</Text>
-            <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>Forward expense emails to your Kharcha inbox.</Text>
-            <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>AI will create draft expenses automatically.</Text>
+            {selectedUsers.size > 0 ? (
+              <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>No drafts found for selected user(s).</Text>
+            ) : (
+              <>
+                <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>Forward expense emails to your Kharcha inbox.</Text>
+                <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>AI will create draft expenses automatically.</Text>
+              </>
+            )}
           </View>
         )}
       </ScrollView>
+
+      <Modal visible={showUserPicker} transparent animationType="fade" onRequestClose={() => setShowUserPicker(false)}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowUserPicker(false)}>
+          <View style={[s.modal, { backgroundColor: colors.surface }]} onStartShouldSetResponder={() => true}>
+            <View style={s.modalHeader}>
+              <Text style={[s.modalTitle, { color: colors.text, fontFamily }]}>Filter by User</Text>
+              <TouchableOpacity hitSlop={12} onPress={() => setShowUserPicker(false)}>
+                <Text style={[s.modalClose, { color: colors.textMuted }]}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={[s.modalHint, { color: colors.textMuted, fontFamily }]}>Select one or more users to filter their drafts</Text>
+
+            <ScrollView style={{ maxHeight: 320 }}>
+              {users.map(u => {
+                const selected = selectedUsers.has(u.id);
+                return (
+                  <TouchableOpacity key={u.id} style={[s.userRow, selected && { backgroundColor: `${colors.primary}10` }]} onPress={() => toggleUser(u.id)}>
+                    <View style={[s.userCheck, { backgroundColor: selected ? colors.primary : `${colors.border}` }]}>
+                      {selected && <Text style={s.checkMark}>✓</Text>}
+                    </View>
+                    <View style={s.userInfo}>
+                      <Text style={[s.userName, { color: colors.text, fontFamily }]}>{u.name}</Text>
+                      <Text style={[s.userEmail, { color: colors.textMuted, fontFamily }]}>{u.email}</Text>
+                    </View>
+                    <View style={[s.roleBadge, { backgroundColor: u.role === 'admin' ? `${colors.warning}15` : `${colors.primary}10` }]}>
+                      <Text style={[s.roleText, { color: u.role === 'admin' ? colors.warning : colors.primary, fontFamily }]}>{u.role}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {selectedUsers.size > 0 && (
+              <TouchableOpacity style={[s.clearAllBtn, { backgroundColor: `${colors.danger}12` }]} onPress={() => setSelectedUsers(new Set())}>
+                <Text style={[s.clearAllText, { color: colors.danger, fontFamily }]}>Clear Selection</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -195,18 +298,15 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: 24, fontWeight: '700' },
   countBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
   countText: { fontSize: 14, fontWeight: '700' },
-  adminBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
+  filterBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginBottom: 8,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderRadius: 12, borderWidth: 1,
   },
-  adminText: { fontSize: 13, fontWeight: '600' },
+  filterLabel: { flex: 1, fontSize: 14, fontWeight: '600' },
+  filterArrow: { fontSize: 18, fontWeight: '700' },
+  clearBtn: { fontSize: 13, fontWeight: '600' },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -256,4 +356,20 @@ const s = StyleSheet.create({
   emptyLine: { fontSize: 13, color: '#ccc', textAlign: 'center', lineHeight: 22, fontFamily: 'monospace' },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
   emptySub: { fontSize: 14, textAlign: 'center', marginBottom: 4 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modal: { width: '88%', maxWidth: 440, borderRadius: 16, padding: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalClose: { fontSize: 15, fontWeight: '600' },
+  modalHint: { fontSize: 13, marginBottom: 14 },
+  userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4, borderRadius: 10 },
+  userCheck: { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  checkMark: { fontSize: 13, color: '#fff', fontWeight: '700' },
+  userInfo: { flex: 1 },
+  userName: { fontSize: 15, fontWeight: '600' },
+  userEmail: { fontSize: 12 },
+  roleBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  roleText: { fontSize: 11, fontWeight: '600' },
+  clearAllBtn: { paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginTop: 8 },
+  clearAllText: { fontSize: 14, fontWeight: '600' },
 });

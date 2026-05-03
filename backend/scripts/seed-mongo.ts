@@ -1,5 +1,5 @@
 import { MongoClient } from 'mongodb';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -24,6 +24,26 @@ const GLOBAL_CATEGORIES = [
   { name: 'Rent & Housing', color: '#BB8FCE', icon: '🏠' },
   { name: 'Other', color: '#AEB6BF', icon: '📦' },
 ];
+
+const DEFAULT_ACCOUNT_SOURCES = [
+  { label: 'Credit Card', icon: '💳', isActive: true },
+  { label: 'Bank Account/UPI', icon: '🏦', isActive: true },
+  { label: 'Cash', icon: '💵', isActive: true },
+];
+
+async function seedAccountSources(db) {
+  const existing = await db.collection('account_sources').countDocuments();
+  if (existing > 0) {
+    console.log(`  Account sources already exist (${existing}), skipping...`);
+    return;
+  }
+  const now = new Date();
+  await db.collection('account_sources').insertMany(
+    DEFAULT_ACCOUNT_SOURCES.map(s => ({ ...s, createdAt: now, updatedAt: now }))
+  );
+  const count = await db.collection('account_sources').countDocuments();
+  console.log(`  Seeded ${count} account sources`);
+}
 
 async function seedCategories(db) {
   const existing = await db.collection('categories').countDocuments({ userId: null });
@@ -90,17 +110,17 @@ async function seedDemoExpenses(db) {
   };
 
   const expenses = [
-    { amount: 450, description: 'Weekly groceries', merchantName: 'Big Bazaar', date: day(2), status: 'confirmed', categoryName: 'Food & Dining', accountSource: 'UPI' },
-    { amount: 120, description: 'Uber rides', merchantName: 'Uber', date: day(3), status: 'confirmed', categoryName: 'Transportation', accountSource: 'UPI' },
-    { amount: 2500, description: 'New headphones', merchantName: 'Amazon', date: day(5), status: 'confirmed', categoryName: 'Shopping', accountSource: 'Card' },
-    { amount: 800, description: 'Movie tickets + dinner', merchantName: 'BookMyShow', date: day(7), status: 'confirmed', categoryName: 'Entertainment', accountSource: 'UPI' },
-    { amount: 1500, description: 'Electricity bill', merchantName: 'Tata Power', date: day(10), status: 'confirmed', categoryName: 'Bills & Utilities', accountSource: 'Bank Account' },
-    { amount: 350, description: 'Metro card recharge', merchantName: 'DMRC', date: day(12), status: 'confirmed', categoryName: 'Transportation', accountSource: 'UPI' },
+    { amount: 450, description: 'Weekly groceries', merchantName: 'Big Bazaar', date: day(2), status: 'confirmed', categoryName: 'Food & Dining', accountSource: 'Bank Account/UPI' },
+    { amount: 120, description: 'Uber rides', merchantName: 'Uber', date: day(3), status: 'confirmed', categoryName: 'Transportation', accountSource: 'Bank Account/UPI' },
+    { amount: 2500, description: 'New headphones', merchantName: 'Amazon', date: day(5), status: 'confirmed', categoryName: 'Shopping', accountSource: 'Credit Card' },
+    { amount: 800, description: 'Movie tickets + dinner', merchantName: 'BookMyShow', date: day(7), status: 'confirmed', categoryName: 'Entertainment', accountSource: 'Bank Account/UPI' },
+    { amount: 1500, description: 'Electricity bill', merchantName: 'Tata Power', date: day(10), status: 'confirmed', categoryName: 'Bills & Utilities', accountSource: 'Bank Account/UPI' },
+    { amount: 350, description: 'Metro card recharge', merchantName: 'DMRC', date: day(12), status: 'confirmed', categoryName: 'Transportation', accountSource: 'Bank Account/UPI' },
     { amount: 200, description: 'Coffee and snacks', merchantName: 'Starbucks', date: day(14), status: 'confirmed', categoryName: 'Food & Dining', accountSource: 'Cash' },
-    { amount: 999, description: 'Netflix + Spotify annual', merchantName: 'Netflix', date: day(15), status: 'confirmed', categoryName: 'Other', accountSource: 'Card' },
-    { amount: 3000, description: 'Online course', merchantName: 'Udemy', date: day(18), status: 'confirmed', categoryName: 'Education', accountSource: 'Card' },
+    { amount: 999, description: 'Netflix + Spotify annual', merchantName: 'Netflix', date: day(15), status: 'confirmed', categoryName: 'Other', accountSource: 'Credit Card' },
+    { amount: 3000, description: 'Online course', merchantName: 'Udemy', date: day(18), status: 'confirmed', categoryName: 'Education', accountSource: 'Credit Card' },
     { amount: 600, description: 'Pharmacy', merchantName: 'Apollo Pharmacy', date: day(20), status: 'confirmed', categoryName: 'Healthcare', accountSource: 'Cash' },
-    { amount: 150, description: 'Lunch at office', merchantName: 'Zomato', date: day(1), status: 'confirmed', categoryName: 'Food & Dining', accountSource: 'UPI' },
+    { amount: 150, description: 'Lunch at office', merchantName: 'Zomato', date: day(1), status: 'confirmed', categoryName: 'Food & Dining', accountSource: 'Bank Account/UPI' },
     { amount: 500, description: 'Bus pass', merchantName: 'BEST', date: day(25), status: 'confirmed', categoryName: 'Transportation', accountSource: 'Cash' },
   ];
 
@@ -165,6 +185,7 @@ async function showStats(db) {
   const categories = await db.collection('categories').countDocuments();
   const expenses = await db.collection('expenses').countDocuments();
   const budgets = await db.collection('budgets').countDocuments();
+  const accountSources = await db.collection('account_sources').countDocuments();
 
   console.log('\n  Database Statistics:');
   console.log('  ----------------------');
@@ -172,6 +193,7 @@ async function showStats(db) {
   console.log(`  Categories: ${categories}`);
   console.log(`  Expenses:   ${expenses}`);
   console.log(`  Budgets:    ${budgets}`);
+  console.log(`  Acct Srcs:  ${accountSources}`);
   console.log('');
 }
 
@@ -181,10 +203,12 @@ async function resetAll(db) {
   await db.collection('categories').deleteMany({});
   await db.collection('expenses').deleteMany({});
   await db.collection('budgets').deleteMany({});
+  await db.collection('account_sources').deleteMany({});
   console.log('  All collections cleared');
 }
 
 async function seedAll(db) {
+  await seedAccountSources(db);
   await seedCategories(db);
   await seedUsers(db);
   await seedDemoExpenses(db);

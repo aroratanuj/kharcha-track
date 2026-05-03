@@ -82,7 +82,8 @@ export class ExpensesController {
 
   @Delete(':id')
   async delete(@Param('id') id: string, @Req() req: any): Promise<any> {
-    return this.expensesService.delete(id, req.user.userId);
+    const isAdmin = req.user.role === 'admin';
+    return this.expensesService.delete(id, req.user.userId, isAdmin);
   }
 
   @Post('bulk-confirm')

@@ -26,7 +26,7 @@ export class Expense {
   @Prop({ type: Types.ObjectId, ref: 'User' })
   userId: Types.ObjectId;
 
-  @Prop({ enum: ['UPI', 'Card', 'Bank Account', 'Cash'] })
+  @Prop()
   accountSource: string;
 
   @Prop()

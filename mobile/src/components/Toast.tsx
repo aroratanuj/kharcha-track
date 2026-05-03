@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
 import { View, Text, Animated, StyleSheet, Platform } from 'react-native';
 import { shouldLog } from '../hooks/useLogLevel';
 
@@ -57,8 +57,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const error = useCallback((message: string) => showToast(message, 'error'), [showToast]);
   const info = useCallback((message: string) => showToast(message, 'info'), [showToast]);
 
+  const value = useMemo(() => ({ showToast, success, error, info }), [showToast, success, error, info]);
+
   return (
-    <ToastContext.Provider value={{ showToast, success, error, info }}>
+    <ToastContext.Provider value={value}>
       {children}
       <View style={styles.container} pointerEvents="box-none">
         {toasts.map((toast, index) => (

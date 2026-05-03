@@ -10,40 +10,40 @@ interface DatePickerProps {
 }
 
 export default function DatePicker({ value, onChange, error, label }: DatePickerProps) {
-  const { colors } = useTheme();
+  const { colors, fontFamily } = useTheme();
   const parsed = parseDate(value);
 
   if (Platform.OS === 'web') {
     return (
       <View style={{ marginBottom: 20 }}>
-        {label && <Text style={[styles.label, { color: colors.text }]}>{label}</Text>}
+        {!!label && <Text style={[styles.label, { color: colors.text }]}>{label}</Text>}
         <input
           type="date"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           style={{
             width: '100%',
-            height: 48,
+            height: 50,
             padding: '0 14px',
-            fontSize: 16,
-            borderRadius: 10,
+            fontSize: 15,
+            borderRadius: 12,
             borderWidth: 1,
             borderColor: error ? colors.danger : colors.inputBorder,
             backgroundColor: colors.inputBg,
             color: colors.text,
             outline: 'none',
-            fontFamily: 'inherit',
+            fontFamily,
             boxSizing: 'border-box' as const,
           }}
         />
-        {error && <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>}
+        {!!error && <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>}
       </View>
     );
   }
 
   return (
     <View style={{ marginBottom: 20 }}>
-      {label && <Text style={[styles.label, { color: colors.text }]}>{label}</Text>}
+      {!!label && <Text style={[styles.label, { color: colors.text }]}>{label}</Text>}
       <View style={styles.mobilePicker}>
         <View style={styles.mobileField}>
           <Text style={[styles.mobileHint, { color: colors.textMuted }]}>Day</Text>
@@ -82,7 +82,7 @@ export default function DatePicker({ value, onChange, error, label }: DatePicker
           />
         </View>
       </View>
-      {error && <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>}
+      {!!error && <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>}
     </View>
   );
 

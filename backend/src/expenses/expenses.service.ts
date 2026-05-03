@@ -73,14 +73,21 @@ export class ExpensesService {
       filter.status = status;
     }
 
+    const existingUserIds = (await this.userModel.find({}, { _id: 1 }).lean()).map(u => u._id);
+    const unassignedFilter: any = filter.userId
+      ? filter
+      : { ...filter, $or: [{ userId: { $in: existingUserIds } }, { userId: null }] };
+
     const expenses = await this.expenseModel
-      .find(filter)
+      .find(unassignedFilter)
       .sort({ createdAt: -1 })
       .limit(1000)
       .populate<{ categoryId: any; userId: any }>('categoryId userId')
       .lean();
 
-    return expenses.map(e => this.formatAdminExpense(e));
+    return expenses
+      .filter(e => !e.userId || (e.userId && e.userId._id))
+      .map(e => this.formatAdminExpense(e));
   }
 
   async findUnassigned(): Promise<any[]> {
@@ -238,13 +245,12 @@ export class ExpensesService {
       : this.findOne(id, userId);
   }
 
-  async delete(id: string, userId: string): Promise<any> {
+  async delete(id: string, userId: string, isAdmin: boolean = false): Promise<any> {
     const expense = await this.expenseModel.findById(id);
     if (!expense) {
       throw new NotFoundException('Expense not found');
     }
 
-    const isAdmin = false;
     const isOwner = expense.userId && expense.userId.toString() === userId;
 
     if (!isOwner && !isAdmin) {

@@ -87,19 +87,18 @@ function DonutChart({ data, size = 180, strokeWidth = 30 }: { data: { name: stri
           const rotation = (accumulated / 100) * 360 - 90;
           accumulated += item.percentage;
           return (
-            <Circle
-              key={item.name + i}
-              cx={center}
-              cy={center}
-              r={radius}
-              stroke={item.color}
-              strokeWidth={strokeWidth}
-              fill="none"
-              strokeDasharray={strokeDasharray}
-              strokeCap="round"
-              rotation={rotation}
-              origin={`${center}, ${center}`}
-            />
+            <G key={item.name + i} transform={`rotate(${rotation} ${center} ${center})`}>
+              <Circle
+                cx={center}
+                cy={center}
+                r={radius}
+                stroke={item.color}
+                strokeWidth={strokeWidth}
+                fill="none"
+                strokeDasharray={strokeDasharray}
+                strokeLinecap="round"
+              />
+            </G>
           );
         })}
       </Svg>
@@ -307,7 +306,7 @@ export default function HomeScreen() {
             <View style={s.listSection}>
               <Text style={[s.sectionTitle, { color: colors.text, fontFamily }]}>Recent Transactions</Text>
               {expenses.length > 0 ? (
-                expenses.map((item, index) => renderExpense({ item, index }))
+                expenses.map((item, index) => <View key={item.id || index}>{renderExpense({ item, index })}</View>)
               ) : (
                 <View style={s.empty}>
                   <Text style={s.emptyLine}>━━━━━━━━━━━━</Text>

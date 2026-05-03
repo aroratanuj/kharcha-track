@@ -168,8 +168,8 @@ export default function ExpenseFormScreen() {
 
           <View style={s.field}>
             <Text style={[s.label, { color: colors.text, fontFamily }]}>Date *</Text>
-            <DatePicker label="" value={date} onChange={(val) => { setDate(val); setErrors({ ...errors, date: '' }); }} error="" />
-            {errors.date && <Text style={s.err}>{errors.date}</Text>}
+            <DatePicker value={date} onChange={(val) => { setDate(val); setErrors({ ...errors, date: '' }); }} />
+              {!!errors.date && <Text style={s.err}>{errors.date}</Text>}
           </View>
 
           <View style={s.field}>
@@ -186,7 +186,7 @@ export default function ExpenseFormScreen() {
                 maxLength={12}
               />
             </View>
-            {errors.amount && <Text style={s.err}>{errors.amount}</Text>}
+              {!!errors.amount && <Text style={s.err}>{errors.amount}</Text>}
           </View>
 
           <View style={s.field}>
@@ -199,7 +199,7 @@ export default function ExpenseFormScreen() {
               placeholderTextColor={colors.textMuted}
               maxLength={200}
             />
-            {errors.description && <Text style={s.err}>{errors.description}</Text>}
+              {!!errors.description && <Text style={s.err}>{errors.description}</Text>}
           </View>
 
           <View style={s.field}>
@@ -219,7 +219,7 @@ export default function ExpenseFormScreen() {
                 );
               })}
             </View>
-            {errors.category && <Text style={s.err}>{errors.category}</Text>}
+              {!!errors.category && <Text style={s.err}>{errors.category}</Text>}
           </View>
 
           <View style={s.field}>
@@ -239,11 +239,11 @@ export default function ExpenseFormScreen() {
                 );
               })}
             </View>
-            {errors.accountSource && <Text style={s.err}>{errors.accountSource}</Text>}
+              {!!errors.accountSource && <Text style={s.err}>{errors.accountSource}</Text>}
           </View>
 
           <View style={s.btnRow}>
-            <TouchableOpacity style={[s.cancelBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('Home')}>
+            <TouchableOpacity style={[s.cancelBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.goBack()}>
               <Text style={[s.cancelBtnText, { color: colors.text, fontFamily }]}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity

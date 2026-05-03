@@ -1,6 +1,5 @@
 export enum AccountSource {
-  UPI = 'UPI',
-  Card = 'Card',
-  BankAccount = 'Bank Account',
+  CreditCard = 'Credit Card',
+  BankAccountUPI = 'Bank Account/UPI',
   Cash = 'Cash',
 }
