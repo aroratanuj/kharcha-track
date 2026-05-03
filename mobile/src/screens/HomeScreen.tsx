@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, Pressable } from 'react-native';
 import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../components/Toast';
