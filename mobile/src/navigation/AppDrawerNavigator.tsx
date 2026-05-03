@@ -10,6 +10,7 @@ const Drawer = createDrawerNavigator();
 import HomeScreen from '../screens/HomeScreen';
 import ExpenseFormScreen from '../screens/expenses/ExpenseFormScreen';
 import DraftExpensesScreen from '../screens/expenses/DraftExpensesScreen';
+import DraftReviewScreen from '../screens/expenses/DraftReviewScreen';
 import BudgetDashboardScreen from '../screens/budget/BudgetDashboardScreen';
 import AnalyticsDashboardScreen from '../screens/analytics/AnalyticsDashboardScreen';
 import ConfigScreen from '../screens/ConfigScreen';
@@ -113,6 +114,11 @@ export default function AppDrawerNavigator() {
         name="ExpenseForm"
         component={ExpenseFormScreen}
         options={{ drawerItemStyle: { display: 'none' }, title: 'Expense' }}
+      />
+      <Drawer.Screen
+        name="DraftReview"
+        component={DraftReviewScreen}
+        options={{ drawerItemStyle: { display: 'none' }, title: 'Review Draft' }}
       />
       <Drawer.Screen
         name="BudgetDashboard"

@@ -70,12 +70,22 @@ export class ImapMonitorService {
           const envelope = message.envelope;
           const sender = envelope?.from?.[0]?.address || '';
           const subject = envelope?.subject || '';
+          const date = envelope?.date || '';
 
-          const body = this.extractPlainText(
-            (message.source as Buffer).toString(),
-          );
+          const rawSource = (message.source as Buffer).toString();
 
-          if (!sender || !body) {
+          this.logger.log(`--- EMAIL FETCHED ---`);
+          this.logger.log(`From: ${sender}`);
+          this.logger.log(`Subject: ${subject}`);
+          this.logger.log(`Date: ${date}`);
+          this.logger.log(`Raw source length: ${rawSource.length} bytes`);
+
+          const body = this.extractPlainText(rawSource);
+
+          this.logger.log(`Extracted body (${body.length} chars, first 2000):\n${body.substring(0, 2000)}`);
+
+          if (!sender || !body || body.trim().length < 5) {
+            this.logger.warn(`Skipping email - no sender or empty body`);
             await client.messageFlagsAdd(seq, ['\\Seen']);
             continue;
           }
@@ -95,6 +105,9 @@ export class ImapMonitorService {
             body,
             subject,
           );
+
+          this.logger.log(`Parsed result: ${JSON.stringify(parsedExpense, null, 2)}`);
+
           const userId = await this.emailService.findUserByEmail(sender);
 
           if (userId) {
@@ -106,7 +119,7 @@ export class ImapMonitorService {
               parsedExpense,
             );
             this.logger.log(
-              `Draft created for ${sender}: ${parsedExpense.amount || 0} - ${subject}`,
+              `Draft created for ${sender}: INR ${parsedExpense.amount || 0} | ${parsedExpense.description || subject} | ${parsedExpense.accountSource || 'N/A'}`,
             );
           } else {
             const unassignedCount =
@@ -130,11 +143,12 @@ export class ImapMonitorService {
                 .sendAdminNotification(sender, parsedExpense)
                 .catch(() => {});
               this.logger.log(
-                `Unassigned draft created from ${sender}: ${subject}`,
+                `Unassigned draft created from ${sender}: INR ${parsedExpense.amount || 0} | ${parsedExpense.description || subject}`,
               );
             }
           }
 
+          this.logger.log(`--- EMAIL DONE ---\n`);
           await client.messageFlagsAdd(seq, ['\\Seen']);
         } catch (err: any) {
           this.logger.error(`Failed to process email: ${err.message}`);
@@ -151,9 +165,44 @@ export class ImapMonitorService {
   }
 
   private extractPlainText(source: string): string {
-    const bodyStart = source.indexOf('\r\n\r\n');
-    if (bodyStart === -1) return source;
-    return source.substring(bodyStart).replace(/\r\n/g, '\n');
+    const headerEnd = source.indexOf('\r\n\r\n');
+    let body = headerEnd === -1 ? source : source.substring(headerEnd + 4);
+
+    const textPlainMatch = body.match(/Content-Type:\s*text\/plain[^\r\n]*\r\n(?:[\s\S]*?\r\n)?\r\n([\s\S]*?)(?=\r\n--|\r\nContent-Type:)/i);
+    if (textPlainMatch && textPlainMatch[1]) {
+      body = textPlainMatch[1];
+    } else {
+      const textHtmlMatch = body.match(/Content-Type:\s*text\/html[^\r\n]*\r\n(?:[\s\S]*?\r\n)?\r\n([\s\S]*?)(?=\r\n--|\z)/i);
+      if (textHtmlMatch && textHtmlMatch[1]) {
+        body = textHtmlMatch[1];
+        body = body
+          .replace(/<style[\s\S]*?<\/style>/gi, '')
+          .replace(/<script[\s\S]*?<\/script>/gi, '')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<\/p>/gi, '\n')
+          .replace(/<\/div>/gi, '\n')
+          .replace(/<\/tr>/gi, '\n')
+          .replace(/<\/li>/gi, '\n')
+          .replace(/<\/h[1-6]>/gi, '\n')
+          .replace(/<[^>]+>/g, '')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&nbsp;/g, ' ');
+      }
+    }
+
+    body = body
+      .replace(/=\r\n/g, '')
+      .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/\r\n/g, '\n')
+      .replace(/http[s]?:\/\/[^\s]+/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    return body;
   }
 
   private hashContent(str: string): string {

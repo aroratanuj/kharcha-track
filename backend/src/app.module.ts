@@ -12,6 +12,7 @@ import { BudgetsModule } from './budgets/budgets.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { EmailModule } from './email/email.module';
 import { AccountSourceModule } from './account-source/account-source.module';
+import { SettingsModule } from './settings/settings.module';
 import { THROTTLER_CONFIG } from './constants/throttler.config';
 
 @Module({
@@ -33,6 +34,7 @@ import { THROTTLER_CONFIG } from './constants/throttler.config';
     AnalyticsModule,
     EmailModule,
     AccountSourceModule,
+    SettingsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

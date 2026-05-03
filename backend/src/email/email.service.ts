@@ -3,21 +3,26 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Expense, ExpenseDocument } from '../schemas/expense.schema';
 import { User, UserDocument } from '../schemas/user.schema';
-import Groq from 'groq-sdk';
+import { Category, CategoryDocument } from '../schemas/category.schema';
+import { SettingsService } from '../settings/settings.service';
+import { ParsedExpense } from './parsers/expense-parser.interface';
+import { AIParser } from './parsers/ai.parser';
+import { RegexParser } from './parsers/regex.parser';
+import { LLMProviderFactory } from './llm/llm-provider.factory';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private groq: Groq;
 
   constructor(
     @InjectModel(Expense.name) private expenseModel: Model<ExpenseDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
-  ) {
-    this.groq = new Groq({
-      apiKey: process.env.GROQ_API_KEY || '',
-    });
-  }
+    @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
+    private settingsService: SettingsService,
+    private aiParser: AIParser,
+    private regexParser: RegexParser,
+    private llmFactory: LLMProviderFactory,
+  ) {}
 
   async findUserByEmail(email: string): Promise<string | null> {
     const user = await this.userModel.findOne({ email: email.toLowerCase().trim() }).lean();
@@ -36,40 +41,107 @@ export class EmailService {
     });
   }
 
-  async parseExpenseWithAI(emailContent: string, subject?: string) {
-    if (!process.env.GROQ_API_KEY) {
-      this.logger.warn('GROQ_API_KEY not set, using regex fallback');
-      return this.fallbackParsing(emailContent);
+  async getCategoryList(): Promise<Array<{ id: string; name: string }>> {
+    const categories = await this.categoryModel.find().lean();
+    return categories.map((c) => ({ id: c._id.toString(), name: c.name }));
+  }
+
+  async getUserCategoryHistory(
+    userId: string,
+    merchant: string,
+  ): Promise<Map<string, number>> {
+    const merchantLower = merchant.toLowerCase().trim();
+    const expenses = await this.expenseModel
+      .find({
+        userId: new Types.ObjectId(userId),
+        merchantName: { $regex: merchantLower, $options: 'i' },
+        categoryId: { $ne: null },
+        status: { $in: ['draft', 'confirmed'] },
+      })
+      .populate('categoryId')
+      .limit(20)
+      .lean();
+
+    const counts = new Map<string, number>();
+    for (const exp of expenses) {
+      const cat = exp.categoryId as any;
+      if (cat && cat.name) {
+        counts.set(cat.name, (counts.get(cat.name) || 0) + 1);
+      }
+    }
+    return counts;
+  }
+
+  async deduceCategory(
+    emailContent: string,
+    merchant: string,
+    description: string,
+    userId?: string,
+  ): Promise<{ id?: string; name?: string; method: 'history' | 'llm' | 'none' }> {
+    const categories = await this.getCategoryList();
+    if (categories.length === 0) return { method: 'none' };
+
+    if (userId && merchant && merchant !== 'Unknown') {
+      const history = await this.getUserCategoryHistory(userId, merchant);
+      if (history.size > 0) {
+        let topCategory = '';
+        let topCount = 0;
+        for (const [name, count] of history) {
+          if (count > topCount) {
+            topCount = count;
+            topCategory = name;
+          }
+        }
+        const match = categories.find((c) => c.name === topCategory);
+        if (match) {
+          this.logger.log(`Category from history: "${topCategory}" (${topCount} matches for "${merchant}")`);
+          return { id: match.id, name: match.name, method: 'history' };
+        }
+      }
     }
 
-    const prompt = `
-Extract expense information from this email. Respond ONLY with valid JSON in this format:
-{
-  "amount": number,
-  "description": string,
-  "merchant": string,
-  "date": "YYYY-MM-DD",
-  "confidence": "high" | "medium" | "low"
-}
+    const aiEnabled = await this.settingsService.get('aiEnabled');
+    if (!aiEnabled) return { method: 'none' };
 
-Email content:
-${emailContent.substring(0, 3000)}
-`;
+    const providerName = await this.settingsService.get('aiProvider');
+    const modelName = await this.settingsService.get('llmModel');
+    const provider = this.llmFactory.getProvider(providerName);
+    if (!provider) return { method: 'none' };
 
     try {
-      const response = await this.groq.chat.completions.create({
-        messages: [{ role: 'user', content: prompt }],
-        model: 'llama3-70b-8192',
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-      });
+      const catList = categories.map((c) => c.name).join(', ');
+      const suggested = await provider.suggestCategory(
+        merchant,
+        description,
+        emailContent.substring(0, 1000),
+        catList,
+        modelName,
+      );
 
-      const content = response.choices[0].message.content;
-      return JSON.parse(content);
-    } catch {
-      this.logger.warn('AI parsing failed, using fallback');
-      return this.fallbackParsing(emailContent);
+      const match = categories.find((c) => c.name.toLowerCase() === suggested?.toLowerCase());
+      if (match) {
+        this.logger.log(`Category via LLM: "${match.name}"`);
+        return { id: match.id, name: match.name, method: 'llm' };
+      }
+      return { method: 'none' };
+    } catch (err: any) {
+      this.logger.warn(`LLM category deduction failed: ${err.message}`);
+      return { method: 'none' };
     }
+  }
+
+  async parseExpenseWithAI(emailContent: string, subject?: string): Promise<ParsedExpense> {
+    const aiEnabled = await this.settingsService.get('aiEnabled');
+    const categories = await this.getCategoryList();
+
+    if (aiEnabled) {
+      const providerName = await this.settingsService.get('aiProvider');
+      const modelName = await this.settingsService.get('llmModel');
+      return this.aiParser.parse(emailContent, subject || '', categories, providerName, modelName);
+    }
+
+    this.logger.warn('AI disabled, using regex only');
+    return this.regexParser.parse(emailContent, subject || '');
   }
 
   async processEmail(
@@ -77,9 +149,24 @@ ${emailContent.substring(0, 3000)}
     userId: string,
     subject: string,
     digest: string,
-    parsedExpense: any,
+    parsedExpense: ParsedExpense,
   ) {
     try {
+      let categoryId: any = undefined;
+      if (parsedExpense.suggestedCategoryId) {
+        categoryId = new Types.ObjectId(parsedExpense.suggestedCategoryId);
+      } else {
+        const catResult = await this.deduceCategory(
+          emailContent,
+          parsedExpense.merchant,
+          parsedExpense.description,
+          userId,
+        );
+        if (catResult.id) {
+          categoryId = new Types.ObjectId(catResult.id);
+        }
+      }
+
       const expense = await this.expenseModel.create({
         userId: new Types.ObjectId(userId),
         amount: parsedExpense.amount || 0,
@@ -87,22 +174,23 @@ ${emailContent.substring(0, 3000)}
         merchantName: parsedExpense.merchant || '',
         date: parsedExpense.date ? new Date(parsedExpense.date) : new Date(),
         status: 'draft',
+        categoryId,
+        accountSource: parsedExpense.accountSource || undefined,
         emailDigest: digest,
         metadata: {
           emailContent,
           subject,
-          confidence: parsedExpense.confidence || 'low',
           source: 'email',
+          parseMethod: parsedExpense.parseMethod,
+          overallConfidence: parsedExpense.overallConfidence,
+          fieldConfidence: parsedExpense.fieldConfidence,
+          categoryMethod: parsedExpense.suggestedCategoryId ? 'ai' : 'regex-history',
         },
       });
 
-      return {
-        success: true,
-        expenseId: expense._id.toString(),
-        parsed: parsedExpense,
-      };
+      return { success: true, expenseId: expense._id.toString(), parsed: parsedExpense };
     } catch (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
@@ -111,7 +199,7 @@ ${emailContent.substring(0, 3000)}
     senderEmail: string,
     subject: string,
     digest: string,
-    parsedExpense: any,
+    parsedExpense: ParsedExpense,
   ) {
     try {
       const expense = await this.expenseModel.create({
@@ -120,75 +208,23 @@ ${emailContent.substring(0, 3000)}
         merchantName: parsedExpense.merchant || '',
         date: parsedExpense.date ? new Date(parsedExpense.date) : new Date(),
         status: 'unassigned',
+        accountSource: parsedExpense.accountSource || undefined,
         emailDigest: digest,
         metadata: {
           emailContent,
           subject,
           senderEmail: senderEmail.toLowerCase().trim(),
-          confidence: parsedExpense.confidence || 'low',
           source: 'email',
+          parseMethod: parsedExpense.parseMethod,
+          overallConfidence: parsedExpense.overallConfidence,
+          fieldConfidence: parsedExpense.fieldConfidence,
+          suggestedCategory: parsedExpense.suggestedCategoryName,
         },
       });
 
-      return {
-        success: true,
-        expenseId: expense._id.toString(),
-        parsed: parsedExpense,
-      };
+      return { success: true, expenseId: expense._id.toString(), parsed: parsedExpense };
     } catch (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
-  }
-
-  private fallbackParsing(emailContent: string, subject?: string) {
-    const text = [subject, emailContent].filter(Boolean).join('\n');
-
-    const amountMatch = text.match(/(?:Rs\.?|INR|₹|\$)\s*(\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?)/i);
-    const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
-
-    const dateMatch = text.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
-    let date = new Date().toISOString().split('T')[0];
-    if (dateMatch) {
-      let y = parseInt(dateMatch[3]);
-      if (y < 100) y += 2000;
-      const m = parseInt(dateMatch[2]);
-      const d = parseInt(dateMatch[1]);
-      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-        date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      }
-    }
-
-    let merchant = 'Unknown';
-    const merchantPatterns = [
-      /at\s+(?:Upi\s+)?([A-Z][A-Za-z\s.]+?)(?:\s+is\s+Approved|\s+is\s+Declined|\.|\s*$)/im,
-      /at\s+([A-Z][A-Za-z\s.]+?)(?:\s+on\s+\d|\s+for\s+INR|\s+for\s+Rs|\.|\s*$)/im,
-      /merchant[:\s]+([A-Z][A-Za-z0-9\s.]+?)(?:\s*$|\n|\.)/im,
-      /paid\s+to\s+([A-Z][A-Za-z\s.]+?)(?:\s+on|\s+for|\.|\s*$)/im,
-      /to\s+([A-Z][A-Za-z0-9\s.]+?)\s+(?:via|using|on|for)\s/i,
-    ];
-    for (const pat of merchantPatterns) {
-      const m = text.match(pat);
-      if (m) {
-        merchant = m[1].trim().replace(/\s+/g, ' ');
-        if (merchant.length >= 2 && merchant.length <= 80) break;
-        merchant = 'Unknown';
-      }
-    }
-
-    let description = 'Expense from email';
-    if (subject && subject.length > 3) {
-      description = subject.replace(/^(Fwd?:?\s*)/i, '').trim();
-    }
-    if (amount > 0) {
-      description += ` - INR ${amount}`;
-    }
-
-    return {
-      amount,
-      description,
-      merchant,
-      date,
-      confidence: amount > 0 ? 'medium' : 'low',
-    };
   }
 }

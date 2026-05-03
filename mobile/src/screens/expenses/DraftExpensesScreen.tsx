@@ -74,8 +74,8 @@ export default function DraftExpensesScreen() {
     ]);
   }
 
-  function handleEdit(item: DraftExpense) {
-    navigation.navigate('ExpenseForm', { expense: item });
+  function handleEdit(item: DraftExpense, index: number) {
+    navigation.navigate('DraftReview', { index });
   }
 
   function toggleSelect(id: string) {
@@ -110,7 +110,7 @@ export default function DraftExpensesScreen() {
     ]);
   }
 
-  function renderItem({ item }: { item: DraftExpense }) {
+  function renderItem({ item, index }: { item: DraftExpense; index: number }) {
     const isSelected = selectedIds.has(item.id);
     const d = new Date(item.date);
     const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -150,8 +150,8 @@ export default function DraftExpensesScreen() {
           <TouchableOpacity style={[s.actionBtn, { backgroundColor: isDark ? '#1a3a2a' : '#E8F8EF' }]} onPress={() => handleConfirm(item.id)}>
             <Text style={[s.actionBtnText, { color: '#34C759' }]}>Confirm</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[s.actionBtn, { backgroundColor: isDark ? '#1a2a4a' : '#E8F4FF' }]} onPress={() => handleEdit(item)}>
-            <Text style={[s.actionBtnText, { color: colors.primary }]}>Edit</Text>
+          <TouchableOpacity style={[s.actionBtn, { backgroundColor: isDark ? '#1a2a4a' : '#E8F4FF' }]} onPress={() => handleEdit(item, index)}>
+            <Text style={[s.actionBtnText, { color: colors.primary }]}>Review</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.actionBtn, { backgroundColor: isDark ? '#3a2020' : '#FFF0F0' }]} onPress={() => handleDelete(item.id)}>
             <Text style={[s.actionBtnText, { color: '#FF3B30' }]}>Delete</Text>
@@ -176,11 +176,19 @@ export default function DraftExpensesScreen() {
                 {selectedIds.size === drafts.length ? 'Deselect All' : 'Select All'}
               </Text>
             </TouchableOpacity>
-            {selectedIds.size > 0 && (
-              <TouchableOpacity style={[s.bulkConfirmBtn, { backgroundColor: colors.primary }]} onPress={handleBulkConfirm}>
-                <Text style={s.bulkConfirmText}>Confirm ({selectedIds.size})</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={[s.reviewAllBtn, { backgroundColor: colors.primary }]}
+                onPress={() => navigation.navigate('DraftReview', { index: 0 })}
+              >
+                <Text style={s.bulkConfirmText}>Review All ({drafts.length})</Text>
               </TouchableOpacity>
-            )}
+              {selectedIds.size > 0 && (
+                <TouchableOpacity style={[s.bulkConfirmBtn, { backgroundColor: '#34C759' }]} onPress={handleBulkConfirm}>
+                  <Text style={s.bulkConfirmText}>Confirm ({selectedIds.size})</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )}
 
