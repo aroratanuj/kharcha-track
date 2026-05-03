@@ -114,7 +114,7 @@ function DonutChart({ data, size = 180, strokeWidth = 30 }: { data: { name: stri
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { colors, isDark, fontFamily } = useTheme();
   const toast = useToast();
   const isAdmin = user?.role === 'admin';
@@ -245,6 +245,9 @@ export default function HomeScreen() {
                 <TouchableOpacity onPress={handleNextMonth} hitSlop={12} disabled={isCurrentMonth} style={isCurrentMonth && s.disabled}>
                   <Text style={[s.heroArrow, isCurrentMonth && { opacity: 0.3 }]}>&#8250;</Text>
                 </TouchableOpacity>
+                <TouchableOpacity onPress={signOut} hitSlop={12} style={s.logoutBtn}>
+                  <Text style={s.logoutIcon}>⏻</Text>
+                </TouchableOpacity>
               </View>
               <AnimatedCounter
                 value={summary?.totalSpent || 0}
@@ -351,6 +354,8 @@ const s = StyleSheet.create({
   heroArrow: { fontSize: 26, color: 'rgba(255,255,255,0.8)', fontWeight: '300', width: 36, textAlign: 'center' },
   heroSub: { fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 8 },
   disabled: { opacity: 0.3 },
+  logoutBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  logoutIcon: { fontSize: 16 },
   draftBanner: {
     flexDirection: 'row',
     alignItems: 'center',
