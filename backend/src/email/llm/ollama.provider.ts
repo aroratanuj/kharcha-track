@@ -54,7 +54,7 @@ export class OllamaProvider implements LLMProvider {
   "description": "<brief description>",
   "merchant": "<merchant name or empty string>",
   "date": "<YYYY-MM-DD or empty string>",
-  "accountSource": "<Credit Card, Bank Account, UPI, Cash, or empty string>",
+  "accountSource": "<Credit Card, Bank Account/UPI, or Cash, or empty string>",
   "suggestedCategory": "<best match from: ${categoryList} or empty string>",
   "amountConfidence": "<high, medium, or low>",
   "descriptionConfidence": "<high, medium, or low>",

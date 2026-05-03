@@ -28,7 +28,7 @@ export class GroqProvider implements LLMProvider {
   "description": "<brief description including merchant/context>",
   "merchant": "<merchant name or empty string if unknown>",
   "date": "<YYYY-MM-DD or empty string if not found>",
-  "accountSource": "<one of: Credit Card, Bank Account, UPI, Cash, or empty string>",
+  "accountSource": "<Credit Card, Bank Account/UPI, or Cash, or empty string>",
   "suggestedCategory": "<best match from: ${categoryList} or empty string>",
   "amountConfidence": "<high, medium, or low>",
   "descriptionConfidence": "<high, medium, or low>",
@@ -43,7 +43,7 @@ Rules:
 - description: use text around the amount, include merchant name
 - merchant: extract where the transaction happened. Empty string if unknown.
 - date: transaction date from email (DD-MM-YYYY or similar). Empty string if not found.
-- accountSource: "Credit Card" if credit card mentioned, "UPI" if UPI mentioned, "Bank Account" if debit card/bank, "Cash" if cash. Empty string if unsure.
+  - accountSource: "Credit Card" if credit card mentioned, "Bank Account/UPI" if UPI/debit card/bank mentioned, "Cash" if cash. Empty string if unsure.
 - suggestedCategory: pick the most relevant category from the list. Empty string if unsure.
 - For confidence: "high" = clearly stated in email, "medium" = likely but not explicit, "low" = guessed or not found.
 

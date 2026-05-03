@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { setLoginRedirect } from '../services/api';
@@ -9,7 +9,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import AppDrawerNavigator from './AppDrawerNavigator';
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
   const { user, loading, signOut } = useAuth();
@@ -28,17 +28,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer theme={{
-      dark: isDark,
-      colors: {
-        primary: colors.primary,
-        background: colors.bg,
-        card: colors.card,
-        text: colors.text,
-        border: colors.border,
-        notification: colors.primary,
-      },
-    }}>
+    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <Stack.Navigator screenOptions={{
         headerStyle: { backgroundColor: colors.headerBg },
         headerTintColor: colors.text,
@@ -56,6 +46,6 @@ export default function AppNavigator() {
           />
         )}
       </Stack.Navigator>
-    </NavigationContainer>
+    </ThemeProvider>
   );
 }

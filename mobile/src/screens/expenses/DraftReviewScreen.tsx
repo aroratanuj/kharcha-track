@@ -238,9 +238,6 @@ export default function DraftReviewScreen() {
       <View style={[s.screenBorder, { backgroundColor: colors.surface, borderColor: colors.screenBorder }]}>
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator>
           <View style={s.header}>
-            <TouchableOpacity onPress={handleDelete} style={s.headerDelete} hitSlop={10}>
-              <Text style={{ color: '#FF3B30', fontSize: 18 }}>🗑</Text>
-            </TouchableOpacity>
             <Text style={[s.headerTitle, { color: colors.text }]}>
               Draft {currentIndex + 1} of {drafts.length}
             </Text>
@@ -348,38 +345,55 @@ export default function DraftReviewScreen() {
             )}
           </View>
 
-          <View style={s.actions}>
-            <TouchableOpacity
-              style={[s.navBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => goTo(-1)}
-              disabled={currentIndex === 0}
-            >
-              <Text style={[s.navBtnText, { color: currentIndex === 0 ? colors.textMuted : colors.text }]}>← Prev</Text>
-            </TouchableOpacity>
+          <View style={[s.footer, { borderTopColor: colors.border, backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.02)' }]}>
+            <View style={s.navDots}>
+              {drafts.map((_, i) => (
+                <View key={i} style={[s.dot, { backgroundColor: i === currentIndex ? colors.primary : colors.border }]} />
+              ))}
+            </View>
 
-            <TouchableOpacity
-              style={[s.saveBtn, { backgroundColor: isDark ? '#1a2a1a' : '#E8F5E9', opacity: saving ? 0.6 : 1 }]}
-              onPress={handleSave}
-              disabled={saving || confirming}
-            >
-              <Text style={s.saveBtnText}>{saving ? 'Saving...' : '💾 Save'}</Text>
-            </TouchableOpacity>
+            <View style={s.footerRow}>
+              <TouchableOpacity
+                style={[s.navBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => goTo(-1)}
+                disabled={currentIndex === 0}
+              >
+                <Text style={[s.navBtnText, { color: currentIndex === 0 ? colors.textMuted : colors.text }]}>← Prev</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[s.confirmBtn, { backgroundColor: colors.primary, opacity: confirming ? 0.6 : 1 }]}
-              onPress={handleConfirm}
-              disabled={saving || confirming}
-            >
-              <Text style={s.confirmBtnText}>{confirming ? 'Confirming...' : '✓ Confirm'}</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.deleteBtn, { backgroundColor: isDark ? '#3a2020' : '#FFF0F0' }]}
+                onPress={handleDelete}
+              >
+                <Text style={s.deleteBtnText}>🗑 Delete</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[s.navBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => goTo(1)}
-              disabled={currentIndex >= drafts.length - 1}
-            >
-              <Text style={[s.navBtnText, { color: currentIndex >= drafts.length - 1 ? colors.textMuted : colors.text }]}>Next →</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.navBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => goTo(1)}
+                disabled={currentIndex >= drafts.length - 1}
+              >
+                <Text style={[s.navBtnText, { color: currentIndex >= drafts.length - 1 ? colors.textMuted : colors.text }]}>Next →</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={s.actionRow}>
+              <TouchableOpacity
+                style={[s.saveBtn, { backgroundColor: isDark ? '#1a2a1a' : '#E8F5E9', opacity: saving ? 0.6 : 1 }]}
+                onPress={handleSave}
+                disabled={saving || confirming}
+              >
+                <Text style={s.saveBtnText}>{saving ? 'Saving...' : '💾 Save as Draft'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[s.confirmBtn, { backgroundColor: colors.primary, opacity: confirming ? 0.6 : 1 }]}
+                onPress={handleConfirm}
+                disabled={saving || confirming}
+              >
+                <Text style={s.confirmBtnText}>{confirming ? 'Confirming...' : '✓ Save & Confirm'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -429,37 +443,23 @@ const s = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 16 },
   backBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10, borderWidth: 1, minHeight: 44, justifyContent: 'center' },
   backBtnText: { fontSize: 16, fontWeight: '600' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 16, paddingBottom: 8, paddingHorizontal: 16, position: 'relative' },
-  headerDelete: { position: 'absolute', left: 16, padding: 8 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 16, paddingBottom: 8, paddingHorizontal: 16 },
   methodBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   methodText: { fontSize: 12, fontWeight: '700' },
   confBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   confText: { fontSize: 12, fontWeight: '700' },
-  navDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 8 },
+  navDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 10 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   fields: { paddingHorizontal: 16 },
-  input: { borderRadius: 10, padding: 14, fontSize: 16, borderWidth: 1 },
-  accountRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  accChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 2, gap: 6, minHeight: 44 },
-  accIcon: { fontSize: 16 },
-  accLabel: { fontSize: 12, fontWeight: '600' },
-  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  catChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 2, gap: 4, width: '23%', minHeight: 44, justifyContent: 'center' },
-  catIcon: { fontSize: 16 },
-  catLabel: { fontSize: 10, textAlign: 'center' },
-  merchantRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 12 },
-  merchantLabel: { fontSize: 13, fontWeight: '600' },
-  merchantValue: { fontSize: 13, flex: 1 },
-  miniBadge: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
-  miniText: { fontSize: 11, fontWeight: '700' },
-  ownerRow: { marginBottom: 12 },
-  ownerLabel: { fontSize: 13, fontStyle: 'italic' },
-  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20, gap: 8 },
-  navBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, borderWidth: 1, minHeight: 44, justifyContent: 'center' },
-  navBtnText: { fontSize: 14, fontWeight: '600' },
-  saveBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, minHeight: 44, justifyContent: 'center' },
-  saveBtnText: { fontSize: 14, fontWeight: '600', color: '#34C759' },
-  confirmBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, minHeight: 44, justifyContent: 'center' },
-  confirmBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  footer: { borderTopWidth: 1, paddingTop: 8 },
+  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 4 },
+  actionRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 20 },
+  navBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, borderWidth: 1, minHeight: 44, justifyContent: 'center' },
+  navBtnText: { fontSize: 15, fontWeight: '600' },
+  deleteBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, minHeight: 44, justifyContent: 'center' },
+  deleteBtnText: { fontSize: 14, fontWeight: '600', color: '#FF3B30' },
+  saveBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, minHeight: 44, justifyContent: 'center', flex: 1, maxWidth: 200 },
+  saveBtnText: { fontSize: 14, fontWeight: '600', color: '#34C759', textAlign: 'center' },
+  confirmBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, minHeight: 44, justifyContent: 'center', flex: 1, maxWidth: 200 },
+  confirmBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', textAlign: 'center' },
 });

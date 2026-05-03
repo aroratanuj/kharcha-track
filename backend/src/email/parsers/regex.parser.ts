@@ -126,8 +126,7 @@ export class RegexParser implements ExpenseParser {
   extractAccountSource(text: string): string | undefined {
     const lower = text.toLowerCase();
     if (/credit\s*card/.test(lower)) return 'Credit Card';
-    if (/\bupi\b/.test(lower)) return 'UPI';
-    if (/debit\s*card|bank\s*account|savings\s*account|current\s*account/.test(lower)) return 'Bank Account';
+    if (/\bupi\b|debit\s*card|bank\s*account|savings\s*account|current\s*account/.test(lower)) return 'Bank Account/UPI';
     if (/\bcash\b/.test(lower)) return 'Cash';
     return undefined;
   }
