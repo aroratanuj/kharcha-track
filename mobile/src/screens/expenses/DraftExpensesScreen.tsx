@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, RefreshControl, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -35,6 +35,12 @@ function confColor(conf?: string) {
   return '#FF3B30';
 }
 
+function confLabel(conf?: string) {
+  if (conf === 'high') return 'H';
+  if (conf === 'medium') return 'M';
+  return 'L';
+}
+
 function relativeTime(dateStr: string): string {
   const now = new Date();
   const d = new Date(dateStr);
@@ -52,7 +58,7 @@ function relativeTime(dateStr: string): string {
 export default function DraftExpensesScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
-  const { colors, fontFamily } = useTheme();
+  const { colors, isDark, fontFamily } = useTheme();
   const toast = useToast();
   const isAdmin = user?.role === 'admin';
 
@@ -61,7 +67,6 @@ export default function DraftExpensesScreen() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserItem[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
-  const [showUserPicker, setShowUserPicker] = useState(false);
 
   const loadDrafts = useCallback(async () => {
     setLoading(true);
@@ -102,6 +107,9 @@ export default function DraftExpensesScreen() {
     }
   }, [selectedUsers, allDrafts]);
 
+  const totalPending = useMemo(() => drafts.reduce((s, d) => s + d.amount, 0), [drafts]);
+  const emailCount = useMemo(() => drafts.filter(d => d.metadata?.source === 'email').length, [drafts]);
+
   function toggleUser(uid: string) {
     setSelectedUsers(prev => {
       const next = new Set(prev);
@@ -111,27 +119,17 @@ export default function DraftExpensesScreen() {
     });
   }
 
-  function filterLabel(): string {
-    if (selectedUsers.size === 0) return 'All Users';
-    if (selectedUsers.size === 1) {
-      const u = users.find(u => u.id === [...selectedUsers][0]);
-      return u ? u.name : '1 user';
-    }
-    return `${selectedUsers.size} users`;
-  }
-
-  function renderItem({ item, index }: { item: DraftExpense; index: number }) {
+  function renderItem({ item }: { item: DraftExpense }) {
     const isEmail = item.metadata?.source === 'email';
     const confidence = item.metadata?.overallConfidence || item.metadata?.confidence || 'medium';
     const cc = confColor(confidence);
     const accIcon = item.accountSource?.includes('Credit') ? '💳' : item.accountSource?.includes('Cash') ? '💵' : '🏦';
-    const isAlt = index % 2 === 1;
 
     return (
       <TouchableOpacity
-        style={[s.card, isAlt && { backgroundColor: colors.cardAlt }]}
+        style={[s.card, { backgroundColor: colors.card, borderColor: cc, borderLeftWidth: 3 }]}
         onPress={() => navigation.navigate('DraftReview', { draftId: item.id })}
-        activeOpacity={0.7}
+        activeOpacity={0.85}
       >
         <View style={[s.cardIcon, { backgroundColor: `${item.category?.color || colors.primary}18` }]}>
           <Text style={{ fontSize: 18 }}>{item.category?.icon || '📥'}</Text>
@@ -139,31 +137,25 @@ export default function DraftExpensesScreen() {
         <View style={s.cardBody}>
           <View style={s.cardTop}>
             <Text style={[s.cardDesc, { color: colors.text, fontFamily }]} numberOfLines={1}>{item.description || 'Untitled'}</Text>
-            <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
-              {isEmail && (
-                <View style={[s.pill, { backgroundColor: `${colors.primary}18` }]}>
-                  <Text style={{ fontSize: 10, marginRight: 3 }}>✉️</Text>
-                  <Text style={[s.pillText, { color: colors.primary, fontFamily }]}>Email</Text>
-                </View>
-              )}
-              <View style={[s.confDot, { backgroundColor: cc }]}>
-                <Text style={[s.confDotText, { color: '#fff', fontFamily }]}>{confidence.charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={s.cardBadges}>
+            {isEmail && (
+              <View style={[s.emailTag, { backgroundColor: `${colors.primary}18` }]}>
+                <Text style={{ fontSize: 10 }}>✉️</Text>
+                <Text style={[s.emailTagText, { color: colors.primary, fontFamily }]}>Email</Text>
               </View>
+            )}
+            <View style={[s.confPill, { backgroundColor: `${cc}18` }]}>
+              <View style={[s.confDot, { backgroundColor: cc }]} />
+              <Text style={[s.confText, { color: cc, fontFamily }]}>{confidence.charAt(0).toUpperCase()}{confidence.slice(1)}</Text>
             </View>
           </View>
-          {item.merchantName ? (
-            <Text style={[s.cardMerchant, { color: colors.textSecondary, fontFamily }]} numberOfLines={1}>{item.merchantName}</Text>
-          ) : null}
           <View style={s.cardMeta}>
-            <Text style={[s.cardAcc, { color: colors.textMuted, fontFamily }]}>{accIcon} {item.accountSource || 'N/A'}</Text>
-            <Text style={[s.cardTime, { color: colors.textMuted, fontFamily }]}>{relativeTime(item.date)}</Text>
+            {item.merchantName ? (
+              <Text style={[s.cardMerchant, { color: colors.textMuted, fontFamily }]} numberOfLines={1}>{item.merchantName}</Text>
+            ) : null}
+            <Text style={[s.cardRight, { color: colors.textMuted, fontFamily }]}>{accIcon} {item.accountSource || 'N/A'} · {relativeTime(item.date)}</Text>
           </View>
-          {item.category && (
-            <View style={[s.catPill, { backgroundColor: `${item.category.color}18`, borderColor: `${item.category.color}40` }]}>
-              <Text style={{ fontSize: 12 }}>{item.category.icon}</Text>
-              <Text style={[s.catPillText, { color: item.category.color, fontFamily }]}>{item.category.name}</Text>
-            </View>
-          )}
           {isAdmin && item.user && (
             <View style={s.ownerRow}>
               <View style={[s.ownerAvatar, { backgroundColor: `${colors.primary}20` }]}>
@@ -185,6 +177,8 @@ export default function DraftExpensesScreen() {
   function renderLoading() {
     return (
       <View>
+        <View style={[s.heroSkeleton, { marginHorizontal: 16, marginTop: 16, height: 100, borderRadius: 20, backgroundColor: colors.skeleton }]} />
+        {isAdmin && <View style={{ marginHorizontal: 16, marginTop: 8, height: 36, borderRadius: 18, backgroundColor: colors.skeleton }} />}
         {[0, 1, 2, 3].map(i => <SkeletonCard key={i} />)}
       </View>
     );
@@ -197,122 +191,175 @@ export default function DraftExpensesScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={loadDrafts} tintColor={colors.primary} colors={[colors.primary]} />}
       >
-        <View style={s.header}>
-          <Text style={[s.headerTitle, { color: colors.text, fontFamily }]}>Drafts</Text>
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            {drafts.length > 0 && !loading && (
-              <View style={[s.countBadge, { backgroundColor: `${colors.primary}18` }]}>
-                <Text style={[s.countText, { color: colors.primary, fontFamily }]}>{drafts.length}</Text>
+        {loading ? renderLoading() : (
+          <>
+            <View style={[s.hero, isDark ? s.heroDark : s.heroLight]}>
+              <Text style={[s.heroEmoji]}>📥</Text>
+              <View style={s.heroAmountRow}>
+                <Text style={s.heroCurrency}>₹</Text>
+                <Text style={s.heroAmount}>
+                  {totalPending >= 100000
+                    ? `${(totalPending / 100000).toFixed(1)}L`
+                    : totalPending >= 1000
+                      ? `${(totalPending / 1000).toFixed(1)}k`
+                      : totalPending.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </Text>
+              </View>
+              <Text style={[s.heroSub, { fontFamily }]}>
+                {drafts.length} pending draft{drafts.length !== 1 ? 's' : ''} awaiting review
+              </Text>
+              {emailCount > 0 && (
+                <View style={s.heroTrust}>
+                  <Text style={{ fontSize: 11 }}>✉️</Text>
+                  <Text style={[s.heroTrustText, { fontFamily }]}>{emailCount} parsed from email</Text>
+                </View>
+              )}
+            </View>
+
+            {isAdmin && users.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.pillRow}
+              >
+                <TouchableOpacity
+                  style={[s.pill, selectedUsers.size === 0 && { backgroundColor: colors.primary }]}
+                  onPress={() => setSelectedUsers(new Set())}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.pillText, selectedUsers.size === 0 ? { color: '#fff' } : { color: colors.text }, { fontFamily }]}>All</Text>
+                </TouchableOpacity>
+                {users.map(u => {
+                  const sel = selectedUsers.has(u.id);
+                  return (
+                    <TouchableOpacity
+                      key={u.id}
+                      style={[s.pill, sel && { backgroundColor: colors.primary }]}
+                      onPress={() => toggleUser(u.id)}
+                      activeOpacity={0.7}
+                    >
+                      {!sel && (
+                        <View style={[s.pillAvatar, { backgroundColor: `${colors.primary}20` }]}>
+                          <Text style={[s.pillAvatarText, { color: colors.primary, fontFamily }]}>{u.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                      )}
+                      <Text style={[s.pillText, sel ? { color: '#fff' } : { color: colors.text }, { fontFamily }]} numberOfLines={1}>{u.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            <View style={s.sectionHeader}>
+              <Text style={[s.sectionTitle, { color: colors.text, fontFamily }]}>Pending Drafts</Text>
+              {drafts.length > 0 && (
+                <View style={[s.countBadge, { backgroundColor: `${colors.primary}18` }]}>
+                  <Text style={[s.countText, { color: colors.primary, fontFamily }]}>{drafts.length}</Text>
+                </View>
+              )}
+            </View>
+
+            {drafts.length > 0 ? (
+              drafts.map((item, index) => <View key={item.id}>{renderItem({ item, index })}</View>)
+            ) : (
+              <View style={s.empty}>
+                <View style={s.emptyCard}>
+                  <Text style={s.emptyIcon}>📥</Text>
+                  <Text style={[s.emptyTitle, { color: colors.text, fontFamily }]}>No Pending Drafts</Text>
+                  {selectedUsers.size > 0 ? (
+                    <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>No drafts found for selected user(s).</Text>
+                  ) : (
+                    <>
+                      <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>Forward expense emails to your</Text>
+                      <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>Kharcha inbox. AI creates drafts automatically.</Text>
+                    </>
+                  )}
+                </View>
               </View>
             )}
-          </View>
-        </View>
-
-        {isAdmin && (
-          <TouchableOpacity
-            style={[s.filterBar, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}20` }]}
-            onPress={() => setShowUserPicker(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={{ fontSize: 14 }}>👤</Text>
-            <Text style={[s.filterLabel, { color: colors.text, fontFamily }]}>Filter: {filterLabel()}</Text>
-            {selectedUsers.size > 0 && (
-              <TouchableOpacity hitSlop={12} onPress={() => setSelectedUsers(new Set())}>
-                <Text style={[s.clearBtn, { color: colors.primary, fontFamily }]}>Clear</Text>
-              </TouchableOpacity>
-            )}
-            <Text style={[s.filterArrow, { color: colors.textMuted }]}>›</Text>
-          </TouchableOpacity>
-        )}
-
-        {loading ? (
-          renderLoading()
-        ) : drafts.length > 0 ? (
-          drafts.map((item, index) => <View key={item.id}>{renderItem({ item, index })}</View>)
-        ) : (
-          <View style={s.empty}>
-            <View style={s.emptyArt}>
-              <Text style={s.emptyLine}>╭──────────────╮</Text>
-              <Text style={s.emptyLine}>│    📥 ✉️     │</Text>
-              <Text style={s.emptyLine}>╰──────────────╯</Text>
-            </View>
-            <Text style={[s.emptyTitle, { color: colors.text, fontFamily }]}>No Pending Drafts</Text>
-            {selectedUsers.size > 0 ? (
-              <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>No drafts found for selected user(s).</Text>
-            ) : (
-              <>
-                <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>Forward expense emails to your Kharcha inbox.</Text>
-                <Text style={[s.emptySub, { color: colors.textMuted, fontFamily }]}>AI will create draft expenses automatically.</Text>
-              </>
-            )}
-          </View>
+          </>
         )}
       </ScrollView>
-
-      <Modal visible={showUserPicker} transparent animationType="fade" onRequestClose={() => setShowUserPicker(false)}>
-        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowUserPicker(false)}>
-          <View style={[s.modal, { backgroundColor: colors.surface }]} onStartShouldSetResponder={() => true}>
-            <View style={s.modalHeader}>
-              <Text style={[s.modalTitle, { color: colors.text, fontFamily }]}>Filter by User</Text>
-              <TouchableOpacity hitSlop={12} onPress={() => setShowUserPicker(false)}>
-                <Text style={[s.modalClose, { color: colors.textMuted }]}>Done</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={[s.modalHint, { color: colors.textMuted, fontFamily }]}>Select one or more users to filter their drafts</Text>
-
-            <ScrollView style={{ maxHeight: 320 }}>
-              {users.map(u => {
-                const selected = selectedUsers.has(u.id);
-                return (
-                  <TouchableOpacity key={u.id} style={[s.userRow, selected && { backgroundColor: `${colors.primary}10` }]} onPress={() => toggleUser(u.id)}>
-                    <View style={[s.userCheck, { backgroundColor: selected ? colors.primary : `${colors.border}` }]}>
-                      {selected && <Text style={s.checkMark}>✓</Text>}
-                    </View>
-                    <View style={s.userInfo}>
-                      <Text style={[s.userName, { color: colors.text, fontFamily }]}>{u.name}</Text>
-                      <Text style={[s.userEmail, { color: colors.textMuted, fontFamily }]}>{u.email}</Text>
-                    </View>
-                    <View style={[s.roleBadge, { backgroundColor: u.role === 'admin' ? `${colors.warning}15` : `${colors.primary}10` }]}>
-                      <Text style={[s.roleText, { color: u.role === 'admin' ? colors.warning : colors.primary, fontFamily }]}>{u.role}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {selectedUsers.size > 0 && (
-              <TouchableOpacity style={[s.clearAllBtn, { backgroundColor: `${colors.danger}12` }]} onPress={() => setSelectedUsers(new Set())}>
-                <Text style={[s.clearAllText, { color: colors.danger, fontFamily }]}>Clear Selection</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </View>
   );
 }
 
 const s = StyleSheet.create({
   outer: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-  headerTitle: { fontSize: 24, fontWeight: '700' },
+  hero: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 24,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  heroDark: { backgroundColor: '#1A2744' },
+  heroLight: { backgroundColor: '#6C4EF2' },
+  heroEmoji: { fontSize: 28, marginBottom: 8 },
+  heroAmountRow: { flexDirection: 'row', alignItems: 'baseline' },
+  heroCurrency: { fontSize: 22, fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginRight: 2 },
+  heroAmount: { fontSize: 36, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  heroSub: { fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 6 },
+  heroTrust: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  heroTrustText: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.8)' },
+  heroSkeleton: { width: '100%' },
+  pillRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(128,128,128,0.2)',
+  },
+  pillAvatar: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillAvatarText: { fontSize: 10, fontWeight: '700' },
+  pillText: { fontSize: 13, fontWeight: '600' },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '700' },
   countBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
   countText: { fontSize: 14, fontWeight: '700' },
-  filterBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 16, marginBottom: 8,
-    paddingHorizontal: 14, paddingVertical: 12,
-    borderRadius: 12, borderWidth: 1,
-  },
-  filterLabel: { flex: 1, fontSize: 14, fontWeight: '600' },
-  filterArrow: { fontSize: 18, fontWeight: '700' },
-  clearBtn: { fontSize: 13, fontWeight: '600' },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginVertical: 1,
+    marginHorizontal: 16,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginBottom: 6,
   },
   cardIcon: {
     width: 44,
@@ -323,53 +370,34 @@ const s = StyleSheet.create({
     marginRight: 12,
   },
   cardBody: { flex: 1, flexShrink: 1 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  cardDesc: { fontSize: 15, fontWeight: '600', flex: 1 },
-  pill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  pillText: { fontSize: 10, fontWeight: '600' },
-  confDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  confDotText: { fontSize: 11, fontWeight: '700' },
-  cardMerchant: { fontSize: 13, marginTop: 1 },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
-  cardAcc: { fontSize: 11 },
-  cardTime: { fontSize: 11 },
-  catPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    marginTop: 6,
-  },
-  catPillText: { fontSize: 11, fontWeight: '600' },
-  ownerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  ownerAvatar: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  ownerAvatarText: { fontSize: 11, fontWeight: '700' },
-  ownerName: { fontSize: 12 },
+  cardTop: { marginBottom: 4 },
+  cardDesc: { fontSize: 15, fontWeight: '600' },
+  cardBadges: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  emailTag: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  emailTagText: { fontSize: 10, fontWeight: '600' },
+  confPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  confDot: { width: 8, height: 8, borderRadius: 4 },
+  confText: { fontSize: 10, fontWeight: '600' },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  cardMerchant: { fontSize: 12, flex: 1 },
+  cardRight: { fontSize: 11 },
+  ownerRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  ownerAvatar: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  ownerAvatarText: { fontSize: 10, fontWeight: '700' },
+  ownerName: { fontSize: 11 },
   cardAmountWrap: { marginLeft: 12, alignItems: 'flex-end' },
   cardAmount: { fontSize: 16, fontWeight: '700' },
-  empty: { paddingVertical: 60, alignItems: 'center' },
-  emptyArt: { marginBottom: 16 },
-  emptyLine: { fontSize: 13, color: '#ccc', textAlign: 'center', lineHeight: 22, fontFamily: 'monospace' },
+  empty: { paddingVertical: 40, alignItems: 'center', paddingHorizontal: 16 },
+  emptyCard: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(128,128,128,0.25)',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    width: '100%',
+  },
+  emptyIcon: { fontSize: 44, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  emptySub: { fontSize: 14, textAlign: 'center', marginBottom: 4 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modal: { width: '88%', maxWidth: 440, borderRadius: 16, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalClose: { fontSize: 15, fontWeight: '600' },
-  modalHint: { fontSize: 13, marginBottom: 14 },
-  userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4, borderRadius: 10 },
-  userCheck: { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  checkMark: { fontSize: 13, color: '#fff', fontWeight: '700' },
-  userInfo: { flex: 1 },
-  userName: { fontSize: 15, fontWeight: '600' },
-  userEmail: { fontSize: 12 },
-  roleBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  roleText: { fontSize: 11, fontWeight: '600' },
-  clearAllBtn: { paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginTop: 8 },
-  clearAllText: { fontSize: 14, fontWeight: '600' },
+  emptySub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
 });
