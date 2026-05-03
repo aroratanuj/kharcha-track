@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { setLoginRedirect } from '../services/api';
@@ -28,7 +28,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+    <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
       <Stack.Navigator screenOptions={{
         headerStyle: { backgroundColor: colors.headerBg },
         headerTintColor: colors.text,
@@ -46,6 +46,6 @@ export default function AppNavigator() {
           />
         )}
       </Stack.Navigator>
-    </ThemeProvider>
+    </NavigationContainer>
   );
 }
