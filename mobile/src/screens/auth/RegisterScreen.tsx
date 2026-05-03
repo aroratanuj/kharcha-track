@@ -1,10 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/Toast';
-import { useResponsive } from '../../hooks/useResponsive';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,8 +15,7 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
   const toast = useToast();
-  const { colors } = useTheme();
-  const { isWeb, maxContentWidth, contentPadding } = useResponsive();
+  const { colors, fontFamily } = useTheme();
   const navigation = useNavigation<any>();
 
   const emailRef = useRef<TextInput>(null);
@@ -49,97 +47,109 @@ export default function RegisterScreen() {
   function handlePasswordSubmit() { handleRegister(); }
 
   return (
-    <View style={[s.outer, { backgroundColor: colors.bg }]}>
-      <View style={[s.container, isWeb && s.containerWeb, { maxWidth: maxContentWidth, paddingHorizontal: contentPadding, backgroundColor: colors.surface, shadowColor: colors.shadowColor }]}>
-        <Text style={[s.title, { color: colors.primary }]}>Create Account</Text>
-
-        <Text style={[s.label, { color: colors.text }]}>Full Name</Text>
-        <TextInput
-          style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-          placeholder="Full Name"
-          value={name}
-          onChangeText={setName}
-          onSubmitEditing={handleNameSubmit}
-          returnKeyType="next"
-          placeholderTextColor={colors.textMuted}
-          maxLength={100}
-          autoCapitalize="words"
-        />
-
-        <Text style={[s.label, { color: colors.text }]}>Email</Text>
-        <TextInput
-          ref={emailRef}
-          style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          onSubmitEditing={handleEmailSubmit}
-          returnKeyType="next"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholderTextColor={colors.textMuted}
-          maxLength={254}
-          autoComplete="email"
-          textContentType="emailAddress"
-        />
-
-        <Text style={[s.label, { color: colors.text }]}>Password</Text>
-        <View style={s.passwordWrap}>
-          <TextInput
-            ref={passwordRef}
-            style={[s.passwordInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
-            placeholder="Min 8 characters"
-            value={password}
-            onChangeText={setPassword}
-            onSubmitEditing={handlePasswordSubmit}
-            returnKeyType="done"
-            secureTextEntry={!showPassword}
-            placeholderTextColor={colors.textMuted}
-            maxLength={128}
-          />
-          <TouchableOpacity
-            style={[s.eyeBtn, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
-            onPress={() => setShowPassword(!showPassword)}
-            activeOpacity={0.7}
-            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-            accessibilityRole="button"
-          >
-            <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
-          </TouchableOpacity>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={[s.outer, { backgroundColor: colors.bg }]}>
+        <View style={s.header}>
+          <View style={[s.logoRing, { borderColor: 'rgba(255,255,255,0.2)' }]}>
+            <Text style={s.logoIcon}>₹</Text>
+          </View>
+          <Text style={[s.appName, { fontFamily }]}>Kharcha</Text>
+          <Text style={[s.tagline, { fontFamily }]}>Start tracking your expenses</Text>
         </View>
 
-        <TouchableOpacity
-          style={[s.button, loading && s.buttonDisabled, { backgroundColor: colors.primary }]}
-          onPress={handleRegister}
-          disabled={loading}
-          accessibilityLabel="Sign Up"
-        >
-          <Text style={[s.buttonText, { color: colors.primaryText }]}>{loading ? 'Creating...' : 'Sign Up'}</Text>
-        </TouchableOpacity>
+        <View style={[s.card, { backgroundColor: colors.surface }]}>
+          <Text style={[s.cardTitle, { color: colors.text, fontFamily }]}>Create Account</Text>
+          <Text style={[s.cardSub, { color: colors.textMuted, fontFamily }]}>Join for free</Text>
 
-        <TouchableOpacity style={s.linkWrap} onPress={() => navigation.navigate('Login')}>
-          <Text style={[s.link, { color: colors.primary }]}>Already have an account? <Text style={s.linkBold}>Login</Text></Text>
-        </TouchableOpacity>
+          <Text style={[s.label, { color: colors.textMuted, fontFamily }]}>Full Name</Text>
+          <TextInput
+            style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text, fontFamily }]}
+            placeholder="John Doe"
+            placeholderTextColor={colors.textMuted}
+            value={name}
+            onChangeText={setName}
+            onSubmitEditing={handleNameSubmit}
+            returnKeyType="next"
+            autoCapitalize="words"
+            maxLength={100}
+          />
+
+          <Text style={[s.label, { color: colors.textMuted, fontFamily }]}>Email</Text>
+          <TextInput
+            ref={emailRef}
+            style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text, fontFamily }]}
+            placeholder="you@example.com"
+            placeholderTextColor={colors.textMuted}
+            value={email}
+            onChangeText={setEmail}
+            onSubmitEditing={handleEmailSubmit}
+            returnKeyType="next"
+            autoCapitalize="none"
+            keyboardType="email-address"
+            maxLength={254}
+            autoComplete="email"
+            textContentType="emailAddress"
+          />
+
+          <Text style={[s.label, { color: colors.textMuted, fontFamily }]}>Password</Text>
+          <View style={[s.pwWrap, { borderColor: colors.inputBorder, backgroundColor: colors.inputBg }]}>
+            <TextInput
+              ref={passwordRef}
+              style={[s.pwInput, { color: colors.text, fontFamily }]}
+              placeholder="Min 8 characters"
+              placeholderTextColor={colors.textMuted}
+              value={password}
+              onChangeText={setPassword}
+              onSubmitEditing={handlePasswordSubmit}
+              returnKeyType="done"
+              secureTextEntry={!showPassword}
+              maxLength={128}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(p => !p)} hitSlop={12} style={s.pwEye}>
+              <Text style={s.pwEyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[s.btn, loading && s.btnDisabled, { backgroundColor: colors.primary }]}
+            onPress={handleRegister}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            <Text style={[s.btnText, { fontFamily }]}>{loading ? 'Creating...' : 'Create Account'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.linkWrap} onPress={() => navigation.navigate('Login')}>
+            <Text style={[s.link, { fontFamily }]}>
+              <Text style={{ color: colors.textMuted }}>Already have an account? </Text>
+              <Text style={{ color: colors.primary, fontWeight: '700' }}>Sign In</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
-  outer: { flex: 1, justifyContent: 'center' },
-  container: { padding: 24, borderRadius: 16, marginHorizontal: 16, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
-  containerWeb: { alignSelf: 'center', marginHorizontal: 'auto' },
-  title: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 28 },
-  label: { fontSize: 14, fontWeight: '600', marginBottom: 6 },
-  input: { height: 50, borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, marginBottom: 16, fontSize: 16 },
-  passwordWrap: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  passwordInput: { flex: 1, height: 50, borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, fontSize: 16, borderTopRightRadius: 0, borderBottomRightRadius: 0 },
-  eyeBtn: { height: 50, width: 48, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderLeftWidth: 0, borderRadius: 10, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
-  eyeIcon: { fontSize: 18 },
-  button: { borderRadius: 10, height: 50, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { fontSize: 16, fontWeight: '600' },
-  linkWrap: { marginTop: 20, alignItems: 'center' },
+  outer: { flex: 1 },
+  header: { paddingTop: 60, paddingBottom: 32, alignItems: 'center', backgroundColor: '#2A1F5E' },
+  logoRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  logoIcon: { fontSize: 28, color: '#fff', fontWeight: '800' },
+  appName: { fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  tagline: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 },
+  card: { flex: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 28 },
+  cardTitle: { fontSize: 22, fontWeight: '700' },
+  cardSub: { fontSize: 14, marginTop: 4, marginBottom: 24 },
+  label: { fontSize: 13, fontWeight: '600', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.3 },
+  input: { height: 50, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, marginBottom: 16, fontSize: 15 },
+  pwWrap: { height: 50, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 24 },
+  pwInput: { flex: 1, fontSize: 15, height: '100%' },
+  pwEye: { padding: 8 },
+  pwEyeIcon: { fontSize: 18 },
+  btn: { borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  btnDisabled: { opacity: 0.5 },
+  btnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  linkWrap: { marginTop: 24, alignItems: 'center', marginBottom: 40 },
   link: { fontSize: 14 },
-  linkBold: { fontWeight: '700' },
 });
