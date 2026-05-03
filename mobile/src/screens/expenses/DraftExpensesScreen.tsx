@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, M
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { useToast } from '../../components/Toast';
 import { SkeletonCard } from '../../components/SkeletonLoader';
 import api from '../../services/api';
 
@@ -59,7 +58,6 @@ export default function DraftExpensesScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const { colors, isDark, fontFamily } = useTheme();
-  const toast = useToast();
   const isAdmin = user?.role === 'admin';
 
   const [drafts, setDrafts] = useState<DraftExpense[]>([]);
@@ -79,12 +77,12 @@ export default function DraftExpensesScreen() {
       }
       setAllDrafts(res.data || []);
       setDrafts(res.data || []);
-    } catch {
-      toast.error('Failed to load drafts');
+    } catch (_e) {
+      // silent
     } finally {
       setLoading(false);
     }
-  }, [toast, isAdmin]);
+  }, [isAdmin]);
 
   const loadUsers = useCallback(async () => {
     if (!isAdmin) return;

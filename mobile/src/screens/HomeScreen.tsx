@@ -146,7 +146,7 @@ export default function HomeScreen() {
     }
   }, [isAdmin, toast, user, selectedMonth, selectedYear]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(() => { loadData(); });
 
   useEffect(() => {
     const filtered = allExpenses.filter(e => {
