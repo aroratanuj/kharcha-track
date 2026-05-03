@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -7,6 +7,8 @@ import { User, UserDocument } from '../schemas/user.schema';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger('AuthService');
+
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private jwtService: JwtService,
@@ -41,17 +43,22 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    const user = await this.userModel.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await this.userModel.findOne({ email: normalizedEmail });
 
     if (!user) {
+      this.logger.warn(`Login failed for "${normalizedEmail}" — user not found`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isPasswordValid) {
+      this.logger.warn(`Login failed for "${normalizedEmail}" (userId: ${user._id}, role: ${user.role}) — wrong password`);
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    this.logger.log(`Login success for "${normalizedEmail}" (userId: ${user._id}, role: ${user.role})`);
 
     const token = this.generateToken(user._id.toString(), user.email, user.role);
 
