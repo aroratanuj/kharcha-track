@@ -48,13 +48,13 @@ export class EmailService {
 
   async getUserCategoryHistory(
     userId: string,
-    merchant: string,
+    description: string,
   ): Promise<Map<string, number>> {
-    const merchantLower = merchant.toLowerCase().trim();
+    const descLower = description.toLowerCase().trim();
     const expenses = await this.expenseModel
       .find({
         userId: new Types.ObjectId(userId),
-        merchantName: { $regex: merchantLower, $options: 'i' },
+        description: { $regex: descLower.substring(0, 30), $options: 'i' },
         categoryId: { $ne: null },
         status: { $in: ['draft', 'confirmed'] },
       })
@@ -74,15 +74,14 @@ export class EmailService {
 
   async deduceCategory(
     emailContent: string,
-    merchant: string,
     description: string,
     userId?: string,
   ): Promise<{ id?: string; name?: string; method: 'history' | 'llm' | 'none' }> {
     const categories = await this.getCategoryList();
     if (categories.length === 0) return { method: 'none' };
 
-    if (userId && merchant && merchant !== 'Unknown') {
-      const history = await this.getUserCategoryHistory(userId, merchant);
+    if (userId && description && description.length > 3) {
+      const history = await this.getUserCategoryHistory(userId, description);
       if (history.size > 0) {
         let topCategory = '';
         let topCount = 0;
@@ -94,7 +93,7 @@ export class EmailService {
         }
         const match = categories.find((c) => c.name === topCategory);
         if (match) {
-          this.logger.log(`Category from history: "${topCategory}" (${topCount} matches for "${merchant}")`);
+          this.logger.log(`Category from history: "${topCategory}" (${topCount} matches for "${description.substring(0, 30)}")`);
           return { id: match.id, name: match.name, method: 'history' };
         }
       }
@@ -111,7 +110,6 @@ export class EmailService {
     try {
       const catList = categories.map((c) => c.name).join(', ');
       const suggested = await provider.suggestCategory(
-        merchant,
         description,
         emailContent.substring(0, 1000),
         catList,
@@ -158,7 +156,6 @@ export class EmailService {
       } else {
         const catResult = await this.deduceCategory(
           emailContent,
-          parsedExpense.merchant,
           parsedExpense.description,
           userId,
         );
@@ -171,7 +168,7 @@ export class EmailService {
         userId: new Types.ObjectId(userId),
         amount: parsedExpense.amount || 0,
         description: parsedExpense.description || 'Expense from email',
-        merchantName: parsedExpense.merchant || '',
+        merchantName: '',
         date: parsedExpense.date ? new Date(parsedExpense.date) : new Date(),
         status: 'draft',
         categoryId,
@@ -205,7 +202,7 @@ export class EmailService {
       const expense = await this.expenseModel.create({
         amount: parsedExpense.amount || 0,
         description: parsedExpense.description || 'Expense from email',
-        merchantName: parsedExpense.merchant || '',
+        merchantName: '',
         date: parsedExpense.date ? new Date(parsedExpense.date) : new Date(),
         status: 'unassigned',
         accountSource: parsedExpense.accountSource || undefined,

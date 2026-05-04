@@ -51,18 +51,23 @@ export class OllamaProvider implements LLMProvider {
     const prompt = `Extract expense information from this bank transaction email. Respond ONLY with valid JSON:
 {
   "amount": <number or 0>,
-  "description": "<brief description>",
-  "merchant": "<merchant name or empty string>",
+  "description": "<brief description of the transaction>",
   "date": "<YYYY-MM-DD or empty string>",
   "accountSource": "<Credit Card, Bank Account/UPI, or Cash, or empty string>",
   "suggestedCategory": "<best match from: ${categoryList} or empty string>",
   "amountConfidence": "<high, medium, or low>",
   "descriptionConfidence": "<high, medium, or low>",
-  "merchantConfidence": "<high, medium, or low>",
   "dateConfidence": "<high, medium, or low>",
   "accountSourceConfidence": "<high, medium, or low>",
   "categoryConfidence": "<high, medium, or low>"
 }
+
+Rules:
+- amount: extract the transaction amount in numbers (no currency symbol). 0 if not found.
+- description: use text around the amount and transaction context from the email.
+- date: transaction date from email. Empty string if not found.
+- accountSource: "Credit Card" if credit card mentioned, "Bank Account/UPI" if UPI/debit card/net banking/NEFT/IMPS/Google Pay/PhonePe/Paytm/VPA handle mentioned, "Cash" if cash. Empty string if unsure.
+- suggestedCategory: pick the most relevant category from the list. Empty string if unsure.
 
 Email content:
 ${emailContent.substring(0, 3000)}
@@ -81,7 +86,6 @@ Subject: ${subject || 'N/A'}`;
   }
 
   async suggestCategory(
-    merchant: string,
     description: string,
     emailSnippet: string,
     categoryList: string,
@@ -89,7 +93,6 @@ Subject: ${subject || 'N/A'}`;
   ): Promise<string | null> {
     const prompt = `Pick the BEST matching category from this list: ${categoryList}
 
-Merchant: ${merchant}
 Description: ${description}
 Email snippet: ${emailSnippet.substring(0, 1000)}
 

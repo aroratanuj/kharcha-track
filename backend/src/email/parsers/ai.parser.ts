@@ -68,10 +68,6 @@ export class AIParser implements ExpenseParser {
       ? regex.description
       : llm.description || regex.description;
 
-    const merchant = needsRegex(llm.merchantConfidence, llm.merchant)
-      ? regex.merchant
-      : (llm.merchant || regex.merchant);
-
     const date = needsRegex(llm.dateConfidence, llm.date)
       ? regex.date
       : (llm.date || regex.date);
@@ -87,7 +83,6 @@ export class AIParser implements ExpenseParser {
     const fieldConfidence: FieldConfidence = {
       amount: amount > 0 ? (llm.amountConfidence || 'medium') : 'low',
       description: llm.descriptionConfidence || 'medium',
-      merchant: merchant !== 'Unknown' ? (llm.merchantConfidence || 'medium') : 'low',
       date: llm.dateConfidence || 'medium',
       accountSource: accountSource ? (llm.accountSourceConfidence || 'medium') : 'low',
       category: catMatch ? (llm.categoryConfidence || 'medium') : 'low',
@@ -98,7 +93,6 @@ export class AIParser implements ExpenseParser {
         fieldConfidence[k as keyof FieldConfidence] = 'medium';
       });
       if (amount <= 0) fieldConfidence.amount = 'low';
-      if (merchant === 'Unknown') fieldConfidence.merchant = 'low';
       if (!accountSource) fieldConfidence.accountSource = 'low';
     }
 
@@ -107,14 +101,12 @@ export class AIParser implements ExpenseParser {
     const usedRegex = !llmSuccess || [
       needsRegex(llm.amountConfidence, llm.amount),
       needsRegex(llm.descriptionConfidence, llm.description),
-      needsRegex(llm.merchantConfidence, llm.merchant),
       needsRegex(llm.dateConfidence, llm.date),
     ].some(Boolean);
 
     return {
       amount,
       description,
-      merchant,
       date,
       accountSource,
       suggestedCategoryId: catMatch?.id,

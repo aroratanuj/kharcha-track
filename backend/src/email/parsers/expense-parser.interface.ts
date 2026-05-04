@@ -3,7 +3,6 @@ import { Confidence, FieldConfidence } from '../llm/llm-provider.interface';
 export interface ParsedExpense {
   amount: number;
   description: string;
-  merchant: string;
   date: string;
   accountSource?: string;
   suggestedCategoryId?: string;

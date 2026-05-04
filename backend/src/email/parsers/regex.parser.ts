@@ -15,16 +15,14 @@ export class RegexParser implements ExpenseParser {
     const text = this.preprocess([subject, emailContent].filter(Boolean).join('\n'));
     const amount = this.extractAmount(text);
     const date = this.extractDate(text);
-    const merchant = this.extractMerchant(text);
-    const description = this.buildDescription(merchant, amount, subject);
+    const description = this.buildDescription(amount, subject);
     const accountSource = this.extractAccountSource(text);
 
     const fieldConfidence: FieldConfidence = {
       amount: amount > 0 ? 'medium' : 'low',
       description: 'medium',
-      merchant: merchant !== 'Unknown' ? 'medium' : 'low',
       date: 'medium',
-      accountSource: accountSource ? 'medium' : 'low',
+      accountSource: accountSource ? 'high' : 'low',
       category: 'low',
     };
 
@@ -33,7 +31,6 @@ export class RegexParser implements ExpenseParser {
     return {
       amount,
       description,
-      merchant,
       date,
       accountSource,
       fieldConfidence,
@@ -105,38 +102,39 @@ export class RegexParser implements ExpenseParser {
     return new Date().toISOString().split('T')[0];
   }
 
-  extractMerchant(text: string): string {
-    const patterns = [
-      /at\s+(?:Upi\s+)?([A-Z][A-Za-z\s.]+?)(?:\s+is\s+Approved|\s+is\s+Declined|\.|\s*$)/im,
-      /at\s+([A-Z][A-Za-z\s.]+?)(?:\s+on\s+\d|\s+for\s+INR|\s+for\s+Rs|\.|\s*$)/im,
-      /merchant[:\s]+([A-Z][A-Za-z0-9\s.]+?)(?:\s*$|\n|\.)/im,
-      /paid\s+to\s+([A-Z][A-Za-z\s.]+?)(?:\s+on|\s+for|\.|\s*$)/im,
-      /to\s+([A-Z][A-Za-z0-9\s.]+?)\s+(?:via|using|on|for)\s/i,
-    ];
-    for (const pat of patterns) {
-      const m = text.match(pat);
-      if (m) {
-        const extracted = m[1].trim().replace(/\s+/g, ' ');
-        if (extracted.length >= 2 && extracted.length <= 80) return extracted;
-      }
-    }
-    return 'Unknown';
-  }
-
   extractAccountSource(text: string): string | undefined {
     const lower = text.toLowerCase();
-    if (/credit\s*card/.test(lower)) return 'Credit Card';
-    if (/\bupi\b|debit\s*card|bank\s*account|savings\s*account|current\s*account/.test(lower)) return 'Bank Account/UPI';
-    if (/\bcash\b/.test(lower)) return 'Cash';
+
+    if (/credit\s*card|cc\s*transaction|credit\s*card\s*transaction|visa\s*card|master\s*card|mastercard/.test(lower)) {
+      return 'Credit Card';
+    }
+
+    if (
+      /\bupi\b|@upi|@ybl|@okaxis|@paytm|@ibl|@okicici|@okhdfcbank|@sbi|@okaxis|@okbizaxis/.test(lower) ||
+      /vpa|virtual\s*payment\s*address/.test(lower) ||
+      /debit\s*card|atm\s*card/.test(lower) ||
+      /net\s*banking|internet\s*banking|online\s*banking/.test(lower) ||
+      /\bneft\b|\bimps\b|\brtgs\b/.test(lower) ||
+      /bank\s*account|savings\s*account|current\s*account/.test(lower) ||
+      /direct\s*debit|auto\s*debit|ach\s*debit/.test(lower) ||
+      /upi\s*ref|upi\s*id|upi\s*transaction/.test(lower) ||
+      /google\s*pay|gpay|phonepe|bhim|paytm/.test(lower)
+    ) {
+      return 'Bank Account/UPI';
+    }
+
+    if (/\bcash\b|cash\s*withdrawal|cash\s*payment/.test(lower)) {
+      return 'Cash';
+    }
+
     return undefined;
   }
 
-  buildDescription(merchant: string, amount: number, subject?: string): string {
+  buildDescription(amount: number, subject?: string): string {
     let description = 'Expense from email';
     if (subject && subject.length > 3) {
       description = subject.replace(/^(Fwd?:?\s*|Re:\s*)/i, '').trim();
     }
-    if (merchant !== 'Unknown') description = merchant;
     if (amount > 0) description += ` - INR ${amount}`;
     return description;
   }

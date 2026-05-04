@@ -44,7 +44,7 @@ export class EmailSenderService {
       <div style="background: #f0f7ff; border-left: 4px solid #007AFF; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
         <p style="margin: 0 0 8px; color: #333;"><strong>Description:</strong> ${parsedExpense.description || 'N/A'}</p>
         <p style="margin: 0 0 8px; color: #333;"><strong>Amount:</strong> ₹${parsedExpense.amount || 0}</p>
-        <p style="margin: 0 0 8px; color: #333;"><strong>Merchant:</strong> ${parsedExpense.merchant || 'N/A'}</p>
+        <p style="margin: 0 0 8px; color: #333;"><strong>Source:</strong> ${parsedExpense.accountSource || 'N/A'}</p>
         <p style="margin: 0; color: #333;"><strong>Date:</strong> ${parsedExpense.date || 'N/A'}</p>
       </div>
       ` : ''}
@@ -54,7 +54,7 @@ export class EmailSenderService {
       </p>
       <ul style="color: #555; line-height: 1.8; padding-left: 20px;">
         <li><strong>Track expenses effortlessly</strong> — Just forward receipt emails to our inbox</li>
-        <li><strong>AI-powered parsing</strong> — We automatically extract amount, merchant, and date</li>
+        <li><strong>AI-powered parsing</strong> — We automatically extract amount, source, and date</li>
         <li><strong>Review & confirm</strong> — Review AI-extracted drafts and confirm with one tap</li>
         <li><strong>Smart insights</strong> — See spending patterns by category, month, and more</li>
         <li><strong>Budget tracking</strong> — Set limits and stay on top of your spending</li>
@@ -118,7 +118,7 @@ export class EmailSenderService {
         <p style="margin: 0 0 8px; color: #333;"><strong>Received:</strong> ${now}</p>
         ${parsedExpense ? `
         <p style="margin: 0 0 8px; color: #333;"><strong>Expense:</strong> ${parsedExpense.description || 'N/A'} — ₹${parsedExpense.amount || 0}</p>
-        <p style="margin: 0 0 8px; color: #333;"><strong>Merchant:</strong> ${parsedExpense.merchant || 'N/A'}</p>
+        <p style="margin: 0 0 8px; color: #333;"><strong>Source:</strong> ${parsedExpense.accountSource || 'N/A'}</p>
         <p style="margin: 0; color: #333;"><strong>Confidence:</strong> ${parsedExpense.confidence || 'N/A'}</p>
         ` : ''}
       </div>

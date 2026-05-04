@@ -122,6 +122,7 @@ export default function HomeScreen() {
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+  const [drafts, setDrafts] = useState<Expense[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>('monthly');
 
@@ -134,12 +135,16 @@ export default function HomeScreen() {
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
-      const [expRes, sumRes] = await Promise.all([
+      const [expRes, sumRes, draftRes] = await Promise.all([
         api.get(isAdmin ? '/expenses/all' : '/expenses'),
         api.get(`/expenses/summary?month=${selectedMonth}&year=${selectedYear}`),
+        api.get(isAdmin ? '/expenses/all' : '/expenses/drafts', isAdmin ? { params: { status: 'draft' } } : {}),
       ]);
       setAllExpenses(expRes.data);
       if (sumRes.data) setSummary(sumRes.data);
+      const draftData = draftRes.data || [];
+      draftData.sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setDrafts(draftData);
     } catch {
       toast.error('Failed to load data');
     }
@@ -201,6 +206,29 @@ export default function HomeScreen() {
             <Text style={[s.txUser, { color: colors.textMuted, fontFamily }]}>{item.user.name.split(' ')[0]}</Text>
           )}
         </View>
+      </Pressable>
+    );
+  }
+
+  function renderDraftCard(item: Expense) {
+    const confidence = item.metadata?.overallConfidence || item.metadata?.confidence || 'medium';
+    const confColor = confidence === 'high' ? '#2ECC71' : confidence === 'medium' ? '#F5A623' : '#FF3B30';
+    return (
+      <Pressable
+        style={[s.draftCard, { backgroundColor: colors.card, borderLeftColor: confColor }]}
+        onPress={() => navigation.navigate('DraftReview', { draftId: item.id })}
+        activeOpacity={0.8}
+      >
+        <View style={[s.draftCardIcon, { backgroundColor: `${item.category?.color || colors.primary}18` }]}>
+          <Text style={{ fontSize: 16 }}>{item.category?.icon || '📥'}</Text>
+        </View>
+        <View style={s.draftCardBody}>
+          <Text style={[s.draftCardDesc, { color: colors.text, fontFamily }]} numberOfLines={1}>{item.description || 'Untitled'}</Text>
+          <Text style={[s.draftCardMeta, { color: colors.textMuted, fontFamily }]} numberOfLines={1}>{item.merchantName || item.accountSource || 'N/A'} · {relativeTime(item.date)}</Text>
+        </View>
+        <Text style={[s.draftCardAmount, { color: colors.text, fontFamily }]}>
+          ₹{Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+        </Text>
       </Pressable>
     );
   }
@@ -321,11 +349,23 @@ export default function HomeScreen() {
               </View>
             )}
 
+            {drafts.length > 0 && (
+              <View style={s.draftSection}>
+                <View style={s.draftSectionHeader}>
+                  <Text style={[s.sectionTitle, { color: colors.text, fontFamily }]}>Pending Drafts ({drafts.length})</Text>
+                  <TouchableOpacity onPress={() => navigation.navigate('Drafts')}>
+                    <Text style={[s.seeAllText, { color: colors.primary, fontFamily }]}>See all</Text>
+                  </TouchableOpacity>
+                </View>
+                {drafts.slice(0, 3).map((d) => <View key={d.id}>{renderDraftCard(d)}</View>)}
+              </View>
+            )}
+
             <View style={s.listSection}>
               <Text style={[s.sectionTitle, { color: colors.text, fontFamily }]}>Recent Transactions</Text>
               {expenses.length > 0 ? (
-                expenses.map((item, index) => <View key={item.id || index}>{renderExpense({ item, index })}</View>)
-              ) : (
+                expenses.slice(0, 5).map((item, index) => <View key={item.id || index}>{renderExpense({ item, index })}</View>)
+              ) : drafts.length === 0 ? (
                 <View style={s.empty}>
                   <Text style={s.emptyLine}>━━━━━━━━━━━━</Text>
                   <Text style={[s.emptyIcon]}>💰</Text>
@@ -334,7 +374,7 @@ export default function HomeScreen() {
                     {isCurrentMonth ? 'Tap + to add your first expense' : 'No expenses for this period'}
                   </Text>
                 </View>
-              )}
+              ) : null}
             </View>
           </>
         )}
@@ -433,6 +473,36 @@ const s = StyleSheet.create({
   txUser: { fontSize: 11, marginTop: 2 },
   emailTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   emailTagText: { fontSize: 10, fontWeight: '600' },
+  draftSection: { paddingHorizontal: 16, paddingTop: 8 },
+  draftSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  seeAllText: { fontSize: 13, fontWeight: '600' },
+  draftCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderLeftWidth: 3,
+    borderColor: 'transparent',
+    marginBottom: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  draftCardIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  draftCardBody: { flex: 1, flexShrink: 1 },
+  draftCardDesc: { fontSize: 14, fontWeight: '600' },
+  draftCardMeta: { fontSize: 11, marginTop: 2 },
+  draftCardAmount: { fontSize: 15, fontWeight: '700', marginLeft: 10 },
   empty: { paddingVertical: 40, alignItems: 'center' },
   emptyLine: { fontSize: 10, color: '#ccc', marginBottom: 8 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },

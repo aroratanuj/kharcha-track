@@ -25,14 +25,12 @@ export class GroqProvider implements LLMProvider {
     const prompt = `Extract expense information from this bank transaction email. Respond ONLY with valid JSON:
 {
   "amount": <number or 0 if not found>,
-  "description": "<brief description including merchant/context>",
-  "merchant": "<merchant name or empty string if unknown>",
+  "description": "<brief description of the transaction from email context>",
   "date": "<YYYY-MM-DD or empty string if not found>",
   "accountSource": "<Credit Card, Bank Account/UPI, or Cash, or empty string>",
   "suggestedCategory": "<best match from: ${categoryList} or empty string>",
   "amountConfidence": "<high, medium, or low>",
   "descriptionConfidence": "<high, medium, or low>",
-  "merchantConfidence": "<high, medium, or low>",
   "dateConfidence": "<high, medium, or low>",
   "accountSourceConfidence": "<high, medium, or low>",
   "categoryConfidence": "<high, medium, or low>"
@@ -40,10 +38,13 @@ export class GroqProvider implements LLMProvider {
 
 Rules:
 - amount: extract the transaction amount in numbers (no currency symbol). 0 if not found.
-- description: use text around the amount, include merchant name
-- merchant: extract where the transaction happened. Empty string if unknown.
+- description: use text around the amount and transaction context from the email. Include what the payment was for.
 - date: transaction date from email (DD-MM-YYYY or similar). Empty string if not found.
-  - accountSource: "Credit Card" if credit card mentioned, "Bank Account/UPI" if UPI/debit card/bank mentioned, "Cash" if cash. Empty string if unsure.
+- accountSource: determine the payment source:
+  - "Credit Card" if credit card, CC, Visa/Mastercard transaction is mentioned
+  - "Bank Account/UPI" if UPI, debit card, net banking, NEFT, IMPS, RTGS, direct debit, bank transfer, Google Pay, PhonePe, Paytm, BHIM, or any VPA handle (@ybl, @okaxis, @paytm, etc.) is mentioned
+  - "Cash" if cash payment or ATM withdrawal
+  - Empty string only if no payment method can be determined
 - suggestedCategory: pick the most relevant category from the list. Empty string if unsure.
 - For confidence: "high" = clearly stated in email, "medium" = likely but not explicit, "low" = guessed or not found.
 
@@ -69,7 +70,6 @@ Subject: ${subject || 'N/A'}`;
   }
 
   async suggestCategory(
-    merchant: string,
     description: string,
     emailSnippet: string,
     categoryList: string,
@@ -78,7 +78,6 @@ Subject: ${subject || 'N/A'}`;
     const prompt = `You are an expense categorizer. Given the transaction details below, pick the BEST matching category from this list: ${categoryList}
 
 Transaction details:
-Merchant: ${merchant}
 Description: ${description}
 Email snippet: ${emailSnippet.substring(0, 1000)}
 
