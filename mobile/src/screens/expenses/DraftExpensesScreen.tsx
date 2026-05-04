@@ -89,7 +89,7 @@ export default function DraftExpensesScreen() {
     dataApi.run(async () => {
       await Promise.all([loadDrafts(), loadUsers()]);
     });
-  });
+  }, [loadDrafts, loadUsers, dataApi.run]);
 
   useEffect(() => {
     if (selectedUsers.size === 0) {

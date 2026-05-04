@@ -143,9 +143,9 @@ export default function HomeScreen() {
     } catch {
       toast.error('Failed to load data');
     }
-  }, [isAdmin, toast, user, selectedMonth, selectedYear]);
+  }, [isAdmin, user, selectedMonth, selectedYear]);
 
-  useFocusEffect(() => { dataApi.run(loadData); });
+  useFocusEffect(() => { dataApi.run(loadData); }, [loadData, dataApi.run]);
 
   useEffect(() => {
     const filtered = allExpenses.filter(e => {
