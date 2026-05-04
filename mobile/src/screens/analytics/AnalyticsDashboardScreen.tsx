@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/Toast';
 import { Skeleton, SkeletonHero, SkeletonCard } from '../../components/SkeletonLoader';
+import { useApi } from '../../hooks/useApi';
 import api from '../../services/api';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -17,9 +18,9 @@ export default function AnalyticsDashboardScreen() {
   const { user } = useAuth();
   const { colors, fontFamily } = useTheme();
   const toast = useToast();
+  const dataApi = useApi();
   const isAdmin = user?.role === 'admin';
 
-  const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>('30d');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -32,37 +33,34 @@ export default function AnalyticsDashboardScreen() {
   const now = new Date();
   const loadData = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
-    try {
-      const [sumRes, trendRes, catRes] = await Promise.all([
-        api.get('/analytics/summary', isAdmin ? { params: { month: selectedMonth, year: selectedYear } } : {}),
-        api.get('/analytics/trends', { params: { days: period === '7d' ? 7 : 30 } }),
-        api.get('/analytics/by-category', isAdmin ? { params: { month: selectedMonth, year: selectedYear } } : {}),
-      ]);
-      if (sumRes.data) setSummary(sumRes.data);
-      if (trendRes.data) setTrends(trendRes.data);
-      if (catRes.data && catRes.data.length > 0) {
-        const total = catRes.data.reduce((s: number, c: any) => s + (c.amount || 0), 0);
-        const withPct = catRes.data.map((c: any) => ({ ...c, percentage: total > 0 ? Math.round((c.amount / total) * 100) : 0 }));
-        withPct.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
-        setCategories(withPct);
-      }
+    const [sumRes, trendRes, catRes] = await Promise.all([
+      api.get('/analytics/summary', isAdmin ? { params: { month: selectedMonth, year: selectedYear } } : {}),
+      api.get('/analytics/trends', { params: { days: period === '7d' ? 7 : 30 } }),
+      api.get('/analytics/by-category', isAdmin ? { params: { month: selectedMonth, year: selectedYear } } : {}),
+    ]);
+    if (sumRes.data) setSummary(sumRes.data);
+    if (trendRes.data) setTrends(trendRes.data);
+    if (catRes.data && catRes.data.length > 0) {
+      const total = catRes.data.reduce((s: number, c: any) => s + (c.amount || 0), 0);
+      const withPct = catRes.data.map((c: any) => ({ ...c, percentage: total > 0 ? Math.round((c.amount / total) * 100) : 0 }));
+      withPct.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
+      setCategories(withPct);
+    }
 
-      const ins: { text: string; type: 'info' | 'warning' }[] = [];
-      if (catRes.data && catRes.data.length > 0) {
-        const top = catRes.data[0];
-        const total = catRes.data.reduce((s: number, c: any) => s + (c.amount || 0), 0);
-        ins.push({ text: `${top.name || 'Uncategorized'} is your top category (${Math.round(((top.amount || 0) / total) * 100)}%)`, type: 'info' });
-        if (catRes.data.length >= 2) {
-          const second = catRes.data[1];
-          ins.push({ text: `${second.name || 'Uncategorized'} is #2 (${Math.round(((second.amount || 0) / total) * 100)}%)`, type: 'info' });
-        }
+    const ins: { text: string; type: 'info' | 'warning' }[] = [];
+    if (catRes.data && catRes.data.length > 0) {
+      const top = catRes.data[0];
+      const total = catRes.data.reduce((s: number, c: any) => s + (c.amount || 0), 0);
+      ins.push({ text: `${top.name || 'Uncategorized'} is your top category (${Math.round(((top.amount || 0) / total) * 100)}%)`, type: 'info' });
+      if (catRes.data.length >= 2) {
+        const second = catRes.data[1];
+        ins.push({ text: `${second.name || 'Uncategorized'} is #2 (${Math.round(((second.amount || 0) / total) * 100)}%)`, type: 'info' });
       }
-      setInsights(ins);
-    } catch { toast.error('Failed to load analytics'); } finally { setLoading(false); }
-  }, [user, isAdmin, selectedMonth, selectedYear, period, toast]);
+    }
+    setInsights(ins);
+  }, [user, isAdmin, selectedMonth, selectedYear, period]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { dataApi.run(loadData); }, [loadData]);
 
   const maxTrend = trends.length > 0 ? Math.max(...trends.map(t => t.amount)) : 1;
 
@@ -75,7 +73,7 @@ export default function AnalyticsDashboardScreen() {
     else setSelectedMonth(m => m + 1);
   }
 
-  if (loading) {
+  if (dataApi.loading && !dataApi.exhausted) {
     return (
       <View style={[s.outer, { backgroundColor: colors.bg }]}>
         <View style={{ padding: 16 }}>
@@ -85,6 +83,34 @@ export default function AnalyticsDashboardScreen() {
             <Skeleton width="100%" height={200} borderRadius={12} />
             <Skeleton width="100%" height={14} borderRadius={4} />
             {[0, 1, 2, 3].map(i => <SkeletonCard key={i} />)}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  if (dataApi.exhausted) {
+    return (
+      <View style={[s.outer, { backgroundColor: colors.bg }]}>
+        <View style={s.errorContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[s.errorTitle, { color: colors.text, fontFamily }]}>Unable to load analytics</Text>
+          <Text style={[s.errorSub, { color: colors.textMuted, fontFamily }]}>{dataApi.error}</Text>
+          <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={() => dataApi.refetch(loadData)}>
+            <Text style={[s.retryBtnText, { fontFamily }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (dataApi.retrying) {
+    return (
+      <View style={[s.outer, { backgroundColor: colors.bg }]}>
+        <View style={s.retryingOverlay}>
+          <View style={[s.retryingCard, { backgroundColor: colors.card, shadowColor: colors.shadowColor }]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[s.retryingText, { color: colors.textMuted, fontFamily }]}>Retrying...</Text>
           </View>
         </View>
       </View>
@@ -208,4 +234,12 @@ const s = StyleSheet.create({
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
   emptySub: { fontSize: 14, textAlign: 'center' },
+  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, paddingHorizontal: 32 },
+  errorTitle: { fontSize: 18, fontWeight: '700', marginTop: 16, marginBottom: 8 },
+  errorSub: { fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  retryBtn: { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 12, minHeight: 44, justifyContent: 'center' },
+  retryBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  retryingOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  retryingCard: { alignItems: 'center', justifyContent: 'center', padding: 32, borderRadius: 16, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  retryingText: { fontSize: 14, fontWeight: '500', marginTop: 12 },
 });

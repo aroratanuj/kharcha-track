@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import api from '../../services/api';
 import { useToast } from '../../components/Toast';
 import { useTheme } from '../../context/ThemeContext';
+import { useApi } from '../../hooks/useApi';
 
 interface Expense {
   id: string;
@@ -18,7 +19,7 @@ export default function AdminDashboardScreen() {
   const toast = useToast();
   const { colors, fontFamily } = useTheme();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
+  const dataApi = useApi();
   const [activeTab, setActiveTab] = useState('all');
 
   const tabs = [
@@ -27,39 +28,51 @@ export default function AdminDashboardScreen() {
     { key: 'confirmed', label: 'Confirmed' },
   ];
 
-  useEffect(() => { loadExpenses(); }, []);
-  useEffect(() => { if (activeTab !== 'all') loadExpenses(); }, [activeTab]);
+  const loadExpenses = useCallback(async () => {
+    const params: Record<string, string> = {};
+    if (activeTab !== 'all') params.status = activeTab;
+    const response = await api.get('/expenses/all', { params });
+    setExpenses(response.data);
+  }, [activeTab]);
 
-  async function loadExpenses() {
-    setLoading(true);
-    try {
-      const params: Record<string, string> = {};
-      if (activeTab !== 'all') params.status = activeTab;
-      const response = await api.get('/expenses/all', { params });
-      setExpenses(response.data);
-    } catch (error: any) {
-      if (error.message?.includes('Network')) toast.error('Cannot connect to server');
-      else toast.error('Failed to load expenses');
-    } finally { setLoading(false); }
-  }
+  useEffect(() => { dataApi.run(loadExpenses); }, []);
+  useEffect(() => { if (activeTab !== 'all') dataApi.run(loadExpenses); }, [activeTab]);
 
   function handleDeleteExpense(id: string) {
     Alert.alert('Delete Expense', 'Are you sure you want to delete this expense?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await api.delete(`/expenses/${id}`); toast.success('Expense deleted'); await loadExpenses(); }
+        try { await api.delete(`/expenses/${id}`); toast.success('Expense deleted'); await dataApi.refetch(loadExpenses); }
         catch (e: any) { toast.error(e.response?.data?.message || 'Failed to delete expense'); }
       }},
     ]);
   }
 
   async function handleConfirmExpense(id: string) {
-    try { await api.post(`/expenses/${id}/confirm`); toast.success('Expense confirmed'); await loadExpenses(); }
+    try { await api.post(`/expenses/${id}/confirm`); toast.success('Expense confirmed'); await dataApi.refetch(loadExpenses); }
     catch (e: any) { toast.error(e.response?.data?.message || 'Failed to confirm expense'); }
   }
 
   return (
     <View style={[s.outer, { backgroundColor: colors.bg }]}>
+      {dataApi.exhausted ? (
+        <View style={s.errorContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[s.errorTitle, { color: colors.text, fontFamily }]}>Unable to load expenses</Text>
+          <Text style={[s.errorSub, { color: colors.textMuted, fontFamily }]}>{dataApi.error}</Text>
+          <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={() => dataApi.refetch(loadExpenses)}>
+            <Text style={[s.retryBtnText, { fontFamily }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : dataApi.retrying ? (
+        <View style={s.retryingOverlay}>
+          <View style={[s.retryingCard, { backgroundColor: colors.card, shadowColor: colors.shadowColor }]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[s.retryingText, { color: colors.textMuted, fontFamily }]}>Retrying...</Text>
+          </View>
+        </View>
+      ) : (
+        <>
       <View style={s.pillRow}>
         {tabs.map(t => (
           <TouchableOpacity key={t.key} style={[s.pill, activeTab === t.key && { backgroundColor: colors.primary }]} onPress={() => setActiveTab(t.key)}>
@@ -71,9 +84,9 @@ export default function AdminDashboardScreen() {
       <FlatList
         data={expenses}
         keyExtractor={(item) => item.id}
-        refreshing={loading}
+        refreshing={dataApi.loading}
         contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadExpenses} tintColor={colors.primary} colors={[colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={dataApi.loading} onRefresh={() => dataApi.refetch(loadExpenses)} tintColor={colors.primary} colors={[colors.primary]} />}
         renderItem={({ item, index }) => {
           const d = new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
           return (
@@ -120,6 +133,8 @@ export default function AdminDashboardScreen() {
           </View>
         }
       />
+        </>
+      )}
     </View>
   );
 }
@@ -151,4 +166,12 @@ const s = StyleSheet.create({
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
   emptySub: { fontSize: 14, textAlign: 'center' },
+  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, paddingHorizontal: 32 },
+  errorTitle: { fontSize: 18, fontWeight: '700', marginTop: 16, marginBottom: 8 },
+  errorSub: { fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  retryBtn: { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 12, minHeight: 44, justifyContent: 'center' },
+  retryBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  retryingOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  retryingCard: { alignItems: 'center', justifyContent: 'center', padding: 32, borderRadius: 16, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  retryingText: { fontSize: 14, fontWeight: '500', marginTop: 12 },
 });

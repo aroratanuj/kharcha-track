@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { View, Text, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { SkeletonCard } from '../../components/SkeletonLoader';
+import { useApi } from '../../hooks/useApi';
 import api from '../../services/api';
 
 interface DraftExpense {
@@ -62,37 +63,33 @@ export default function DraftExpensesScreen() {
 
   const [drafts, setDrafts] = useState<DraftExpense[]>([]);
   const [allDrafts, setAllDrafts] = useState<DraftExpense[]>([]);
-  const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserItem[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
 
+  const dataApi = useApi();
+
   const loadDrafts = useCallback(async () => {
-    setLoading(true);
-    try {
-      let res;
-      if (isAdmin) {
-        res = await api.get('/expenses/all', { params: { status: 'draft' } });
-      } else {
-        res = await api.get('/expenses/drafts');
-      }
-      setAllDrafts(res.data || []);
-      setDrafts(res.data || []);
-    } catch (_e) {
-      // silent
-    } finally {
-      setLoading(false);
+    let res;
+    if (isAdmin) {
+      res = await api.get('/expenses/all', { params: { status: 'draft' } });
+    } else {
+      res = await api.get('/expenses/drafts');
     }
+    setAllDrafts(res.data || []);
+    setDrafts(res.data || []);
   }, [isAdmin]);
 
   const loadUsers = useCallback(async () => {
     if (!isAdmin) return;
-    try {
-      const res = await api.get('/auth/users');
-      if (res.data) setUsers(res.data);
-    } catch { /* silent */ }
+    const res = await api.get('/auth/users');
+    if (res.data) setUsers(res.data);
   }, [isAdmin]);
 
-  useFocusEffect(() => { loadDrafts(); loadUsers(); });
+  useFocusEffect(() => {
+    dataApi.run(async () => {
+      await Promise.all([loadDrafts(), loadUsers()]);
+    });
+  });
 
   useEffect(() => {
     if (selectedUsers.size === 0) {
@@ -187,9 +184,25 @@ export default function DraftExpensesScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadDrafts} tintColor={colors.primary} colors={[colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={dataApi.loading} onRefresh={() => dataApi.refetch(async () => { await Promise.all([loadDrafts(), loadUsers()]); })} tintColor={colors.primary} colors={[colors.primary]} />}
       >
-        {loading ? renderLoading() : (
+        {dataApi.loading && !dataApi.exhausted ? renderLoading() : dataApi.exhausted ? (
+          <View style={s.errorContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[s.errorTitle, { color: colors.text, fontFamily }]}>Unable to load drafts</Text>
+            <Text style={[s.errorSub, { color: colors.textMuted, fontFamily }]}>{dataApi.error}</Text>
+            <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={() => dataApi.refetch(async () => { await Promise.all([loadDrafts(), loadUsers()]); })}>
+              <Text style={[s.retryBtnText, { fontFamily }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : dataApi.retrying ? (
+          <View style={s.retryingOverlay}>
+            <View style={[s.retryingCard, { backgroundColor: colors.card, shadowColor: colors.shadowColor }]}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={[s.retryingText, { color: colors.textMuted, fontFamily }]}>Retrying...</Text>
+            </View>
+          </View>
+        ) : (
           <>
             <View style={[s.hero, isDark ? s.heroDark : s.heroLight]}>
               <Text style={[s.heroEmoji]}>📥</Text>
@@ -398,4 +411,12 @@ const s = StyleSheet.create({
   emptyIcon: { fontSize: 44, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
   emptySub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, paddingHorizontal: 32 },
+  errorTitle: { fontSize: 18, fontWeight: '700', marginTop: 16, marginBottom: 8 },
+  errorSub: { fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  retryBtn: { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 12, minHeight: 44, justifyContent: 'center' },
+  retryBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  retryingOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  retryingCard: { alignItems: 'center', justifyContent: 'center', padding: 32, borderRadius: 16, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  retryingText: { fontSize: 14, fontWeight: '500', marginTop: 12 },
 });

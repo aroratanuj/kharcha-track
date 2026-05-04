@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, Pressable } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../components/Toast';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { Skeleton, SkeletonCard, SkeletonHero, SkeletonCategoryBar } from '../components/SkeletonLoader';
+import { useApi } from '../hooks/useApi';
 import api from '../services/api';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -122,8 +123,9 @@ export default function HomeScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('monthly');
+
+  const dataApi = useApi();
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
@@ -131,7 +133,6 @@ export default function HomeScreen() {
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
     try {
       const [expRes, sumRes] = await Promise.all([
         api.get(isAdmin ? '/expenses/all' : '/expenses'),
@@ -141,12 +142,10 @@ export default function HomeScreen() {
       if (sumRes.data) setSummary(sumRes.data);
     } catch {
       toast.error('Failed to load data');
-    } finally {
-      setLoading(false);
     }
   }, [isAdmin, toast, user, selectedMonth, selectedYear]);
 
-  useFocusEffect(() => { loadData(); });
+  useFocusEffect(() => { dataApi.run(loadData); });
 
   useEffect(() => {
     const filtered = allExpenses.filter(e => {
@@ -227,10 +226,26 @@ export default function HomeScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} tintColor={colors.primary} colors={[colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={dataApi.loading} onRefresh={() => dataApi.refetch(loadData)} tintColor={colors.primary} colors={[colors.primary]} />}
       >
-        {loading ? (
+        {dataApi.loading && !dataApi.exhausted ? (
           renderLoading()
+        ) : dataApi.exhausted ? (
+          <View style={s.errorContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[s.errorTitle, { color: colors.text, fontFamily }]}>Unable to load data</Text>
+            <Text style={[s.errorSub, { color: colors.textMuted, fontFamily }]}>{dataApi.error}</Text>
+            <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={() => dataApi.refetch(loadData)}>
+              <Text style={[s.retryBtnText, { fontFamily }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : dataApi.retrying ? (
+          <View style={s.retryingOverlay}>
+            <View style={[s.retryingCard, { backgroundColor: colors.card, shadowColor: colors.shadowColor }]}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={[s.retryingText, { color: colors.textMuted, fontFamily }]}>Retrying...</Text>
+            </View>
+          </View>
         ) : (
           <>
             <View style={[s.hero, isDark ? s.heroDark : s.heroLight]}>
@@ -440,4 +455,12 @@ const s = StyleSheet.create({
   },
   fabIcon: { fontSize: 20, fontWeight: '700', color: '#fff', marginRight: 8 },
   fabLabel: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, paddingHorizontal: 32 },
+  errorTitle: { fontSize: 18, fontWeight: '700', marginTop: 16, marginBottom: 8 },
+  errorSub: { fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  retryBtn: { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 12, minHeight: 44, justifyContent: 'center' },
+  retryBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  retryingOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  retryingCard: { alignItems: 'center', justifyContent: 'center', padding: 32, borderRadius: 16, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  retryingText: { fontSize: 14, fontWeight: '500', marginTop: 12 },
 });

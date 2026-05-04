@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../components/Toast';
 import { Skeleton, SkeletonHero } from '../../components/SkeletonLoader';
+import { useApi } from '../../hooks/useApi';
 import api from '../../services/api';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -22,22 +23,19 @@ export default function BudgetDashboardScreen() {
   const { user } = useAuth();
   const { colors, fontFamily } = useTheme();
   const toast = useToast();
+  const dataApi = useApi();
 
-  const [loading, setLoading] = useState(true);
   const [budgets, setBudgets] = useState<BudgetItem[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
-    try {
-      const res = await api.get('/budgets', { params: { month: selectedMonth, year: selectedYear } });
-      if (res.data) setBudgets(res.data);
-    } catch { toast.error('Failed to load budgets'); } finally { setLoading(false); }
-  }, [user, selectedMonth, selectedYear, toast]);
+    const res = await api.get('/budgets', { params: { month: selectedMonth, year: selectedYear } });
+    if (res.data) setBudgets(res.data);
+  }, [user, selectedMonth, selectedYear]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { dataApi.run(loadData); }, [loadData]);
 
   const totalLimit = budgets.reduce((s, b) => s + (b.limit || 0), 0);
   const totalSpent = budgets.reduce((s, b) => s + (b.spent || 0), 0);
@@ -60,7 +58,7 @@ export default function BudgetDashboardScreen() {
     return colors.primary;
   }
 
-  if (loading) {
+  if (dataApi.loading && !dataApi.exhausted) {
     return (
       <View style={[s.outer, { backgroundColor: colors.bg }]}>
         <View style={{ padding: 16 }}>
@@ -68,6 +66,34 @@ export default function BudgetDashboardScreen() {
           <View style={{ gap: 10, paddingVertical: 16 }}>
             <Skeleton width="60%" height={14} borderRadius={4} />
             {[0, 1, 2].map(i => <View key={i} style={[s.skelBudget, { backgroundColor: colors.skeleton }]} />)}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  if (dataApi.exhausted) {
+    return (
+      <View style={[s.outer, { backgroundColor: colors.bg }]}>
+        <View style={s.errorContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[s.errorTitle, { color: colors.text, fontFamily }]}>Unable to load budgets</Text>
+          <Text style={[s.errorSub, { color: colors.textMuted, fontFamily }]}>{dataApi.error}</Text>
+          <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={() => dataApi.refetch(loadData)}>
+            <Text style={[s.retryBtnText, { fontFamily }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (dataApi.retrying) {
+    return (
+      <View style={[s.outer, { backgroundColor: colors.bg }]}>
+        <View style={s.retryingOverlay}>
+          <View style={[s.retryingCard, { backgroundColor: colors.card, shadowColor: colors.shadowColor }]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[s.retryingText, { color: colors.textMuted, fontFamily }]}>Retrying...</Text>
           </View>
         </View>
       </View>
@@ -172,4 +198,12 @@ const s = StyleSheet.create({
   emptyCardTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
   emptyCardSub: { fontSize: 13, textAlign: 'center' },
   skelBudget: { height: 80, borderRadius: 12, marginBottom: 8 },
+  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, paddingHorizontal: 32 },
+  errorTitle: { fontSize: 18, fontWeight: '700', marginTop: 16, marginBottom: 8 },
+  errorSub: { fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  retryBtn: { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 12, minHeight: 44, justifyContent: 'center' },
+  retryBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  retryingOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  retryingCard: { alignItems: 'center', justifyContent: 'center', padding: 32, borderRadius: 16, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  retryingText: { fontSize: 14, fontWeight: '500', marginTop: 12 },
 });
