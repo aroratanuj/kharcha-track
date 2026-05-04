@@ -9,6 +9,23 @@ interface UseApiState<T> {
   exhausted: boolean;
 }
 
+const MAX_RETRIES = 5;
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isRetryableError(error: any): boolean {
+  if (!error.config) return false;
+  if (error.config.method && !['get', 'GET'].includes(error.config.method)) return false;
+  if (error.response) {
+    const status = error.response.status;
+    if (status >= 400 && status < 500) return false;
+    return true;
+  }
+  return true;
+}
+
 export function useApi<T = any>() {
   const [state, setState] = useState<UseApiState<T>>({
     data: null,
@@ -20,44 +37,45 @@ export function useApi<T = any>() {
 
   const attemptRef = useRef(0);
 
-  const run = useCallback(async (apiFn: () => Promise<T>, attempt = 0) => {
-    if (attempt === 0) {
-      setState({ data: null, error: null, loading: true, retrying: false, exhausted: false });
-      attemptRef.current = 0;
-    } else {
-      setState(prev => ({ ...prev, retrying: true, error: null }));
-      attemptRef.current = attempt;
-    }
+  const run = useCallback(async (apiFn: () => Promise<T>) => {
+    setState({ data: null, error: null, loading: true, retrying: false, exhausted: false });
+    attemptRef.current = 0;
 
     try {
       const result = await apiFn();
       setState({ data: result, error: null, loading: false, retrying: false, exhausted: false });
       return result;
     } catch (err: any) {
-      if (err.__exhaustedRetries) {
-        const msg = err.response?.data?.message || err.message || 'Request failed after 5 retries';
-        setState({ data: null, error: msg, loading: false, retrying: false, exhausted: true });
+      if (!isRetryableError(err)) {
+        const msg = err.response?.data?.message || err.message || 'Something went wrong';
+        setState({ data: null, error: msg, loading: false, retrying: false, exhausted: false });
         throw err;
       }
 
-      if (attempt > 0) {
-        setState(prev => ({ ...prev, retrying: false }));
-      } else {
-        const msg = err.response?.data?.message || err.message || 'Something went wrong';
-        setState({ data: null, error: msg, loading: false, retrying: false, exhausted: false });
+      while (attemptRef.current < MAX_RETRIES) {
+        attemptRef.current += 1;
+        setState(prev => ({ ...prev, loading: false, retrying: true, error: null }));
+        await sleep(Math.pow(2, attemptRef.current) * 1000);
+
+        try {
+          const result = await apiFn();
+          setState({ data: result, error: null, loading: false, retrying: false, exhausted: false });
+          return result;
+        } catch (_retryErr) {
+          continue;
+        }
       }
+
+      const msg = err.response?.data?.message || err.message || 'Request failed after 5 retries';
+      setState({ data: null, error: msg, loading: false, retrying: false, exhausted: true });
       throw err;
     }
   }, []);
 
   const refetch = useCallback(async (apiFn: () => Promise<T>) => {
     attemptRef.current = 0;
-    return run(apiFn, 0);
+    return run(apiFn);
   }, [run]);
 
-  const clearError = useCallback(() => {
-    setState(prev => ({ ...prev, error: null, exhausted: false }));
-  }, []);
-
-  return { ...state, run, refetch, clearError };
+  return { ...state, run, refetch };
 }

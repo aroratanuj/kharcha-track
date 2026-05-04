@@ -85,11 +85,11 @@ export default function DraftExpensesScreen() {
     if (res.data) setUsers(res.data);
   }, [isAdmin]);
 
-  useFocusEffect(() => {
+  useFocusEffect(useCallback(() => {
     dataApi.run(async () => {
       await Promise.all([loadDrafts(), loadUsers()]);
     });
-  }, [loadDrafts, loadUsers, dataApi.run]);
+  }, [loadDrafts, loadUsers, dataApi.run]));
 
   useEffect(() => {
     if (selectedUsers.size === 0) {

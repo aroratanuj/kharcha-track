@@ -145,7 +145,7 @@ export default function HomeScreen() {
     }
   }, [isAdmin, user, selectedMonth, selectedYear]);
 
-  useFocusEffect(() => { dataApi.run(loadData); }, [loadData, dataApi.run]);
+  useFocusEffect(useCallback(() => { dataApi.run(loadData); }, [loadData, dataApi.run]));
 
   useEffect(() => {
     const filtered = allExpenses.filter(e => {
